@@ -130,22 +130,19 @@ export class TestEnvironment {
       const composeFile = process.env.COMPOSE_FILE ?? 'standalone.yml';
       this.logger.info(`Using compose file: ${composeFile}`);
       this.dockerEnv = new DockerComposeEnvironment(path.resolve(currentDir, '..'), composeFile)
-        .withWaitStrategy(
-          'counter-proof-server',
-          Wait.forLogMessage('Actix runtime found; starting in Actix runtime', 1),
-        )
-        .withWaitStrategy('counter-indexer', Wait.forLogMessage(/starting indexing/, 1));
+        .withWaitStrategy('lending-proof-server', Wait.forHealthCheck())
+        .withWaitStrategy('lending-indexer', Wait.forHealthCheck());
       this.env = await this.dockerEnv.up();
 
       this.testConfig.dappConfig = {
         ...this.testConfig.dappConfig,
-        indexer: TestEnvironment.mapContainerPort(this.env, this.testConfig.dappConfig.indexer, 'counter-indexer'),
-        indexerWS: TestEnvironment.mapContainerPort(this.env, this.testConfig.dappConfig.indexerWS, 'counter-indexer'),
-        node: TestEnvironment.mapContainerPort(this.env, this.testConfig.dappConfig.node, 'counter-node'),
+        indexer: TestEnvironment.mapContainerPort(this.env, this.testConfig.dappConfig.indexer, 'lending-indexer'),
+        indexerWS: TestEnvironment.mapContainerPort(this.env, this.testConfig.dappConfig.indexerWS, 'lending-indexer'),
+        node: TestEnvironment.mapContainerPort(this.env, this.testConfig.dappConfig.node, 'lending-node'),
         proofServer: TestEnvironment.mapContainerPort(
           this.env,
           this.testConfig.dappConfig.proofServer,
-          'counter-proof-server',
+          'lending-proof-server',
         ),
       };
     }
