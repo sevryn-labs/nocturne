@@ -1,6 +1,7 @@
 {
-  "name": "@midnight-ntwrk/counter-contract",
+  "name": "@midnight-ntwrk/lending-contract",
   "version": "0.1.0",
+  "description": "pUSD collateralised lending protocol on Midnight — Compact smart contract",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -16,10 +17,10 @@
     }
   },
   "scripts": {
-    "compact": "compact compile src/counter.compact src/managed/counter",
+    "compact": "compact compile src/lending.compact src/managed/lending",
     "test": "vitest run",
     "test:compile": "npm run compact && vitest run",
-    "build": "rm -rf dist && tsc --project tsconfig.build.json && cp -Rf ./src/managed ./dist/managed && cp ./src/counter.compact ./dist",
+    "build": "rm -rf dist && tsc --project tsconfig.build.json && cp -Rf ./src/managed ./dist/managed && cp ./src/lending.compact ./dist",
     "lint": "eslint src",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   }

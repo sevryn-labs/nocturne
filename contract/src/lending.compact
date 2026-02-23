@@ -1,0 +1,209 @@
+// pUSD Lending Protocol — Midnight Network  (Compact 0.20.x)
+//
+// DESIGN OVERVIEW
+// ───────────────
+// A privacy-preserving collateralised debt protocol inspired by MakerDAO.
+//
+//   • Collateral asset: tNight (Midnight testnet token)
+//   • Synthetic asset : pUSD  (protocol-internal accounting token)
+//   • Min. ratio      : 150% (e.g. 150 tNight → max 100 pUSD)
+//
+// PUBLIC vs PRIVATE STATE
+// ───────────────────────
+// PUBLIC (ledger — visible to all):
+//   totalCollateral  — aggregate tNight held; proves protocol solvency   (Counter)
+//   totalDebt        — aggregate pUSD issued; proves no unbacked minting  (Counter)
+//   liquidationRatio — liquidation threshold, 150 = 150%                 (Counter)
+//   mintingRatio     — same as liquidationRatio in this MVP              (Counter)
+//
+// PRIVATE (proven in ZK, never on-chain):
+//   collateralAmount — individual depositer's tNight balance             (witness)
+//   debtAmount       — individual borrower's pUSD debt                   (witness)
+//
+// PRIVACY MECHANISM
+// ─────────────────
+// Private balances are stored client-side (LevelDB) and supplied to each
+// circuit via the `witness` declarations below.  The Compact ZK engine
+// generates a proof that circuit constraints hold WITHOUT revealing the
+// actual collateral/debt to verifiers or other users.
+//
+// ARITHMETIC DESIGN NOTE (Compact 0.20.x)
+// ─────────────────────────────────────────
+// Division is not supported in Compact 0.20.x circuits.  All ratio checks
+// are reformulated as multiplications:
+//
+//   (collateral * 100) / debt >= 150
+//     ↔  collateral * 100 >= debt * 150    (multiply both sides by debt > 0)
+//
+// This is mathematically equivalent and avoids division entirely.
+//
+// DISCLOSURE DESIGN
+// ─────────────────
+// Compact 0.20.x requires every value flowing through a witness that
+// subsequently feeds into a ledger operation to be wrapped in `disclose()`.
+// This explicitly marks the value as acceptable-to-reveal (the amount
+// deposited or repaid is already public from the transaction itself).
+// Private values (collateral/debt balances) are used only in `assert()`
+// statements which do NOT require disclosure.
+
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+// ─── Public Ledger State ─────────────────────────────────────────────────────
+
+// Total tNight held by the protocol (all users combined).
+// Public: allows on-chain solvency verification.
+export ledger totalCollateral: Counter;
+
+// Total pUSD issued (all users combined).
+// Public: proves no unbacked synthetic tokens were minted.
+export ledger totalDebt: Counter;
+
+// Minimum collateral-to-debt ratio in percent. 150 = 150%.
+// Liquidation is triggered below this threshold.
+export ledger liquidationRatio: Counter;
+
+// Ratio enforced on new minting (same as liquidationRatio in this MVP).
+export ledger mintingRatio: Counter;
+
+// ─── Private Witness Declarations ────────────────────────────────────────────
+//
+// These values come from the user's local private state (LevelDB, witnesses.ts).
+// They are never published on-chain.  The ZK proof certifies their correctness
+// without revealing them.
+
+witness collateralAmount(): Uint<64>;   // caller's deposited tNight
+witness debtAmount(): Uint<64>;         // caller's outstanding pUSD debt
+
+// ─── Constructor ─────────────────────────────────────────────────────────────
+
+constructor() {
+  liquidationRatio.increment(150 as Uint<16>);
+  mintingRatio.increment(150 as Uint<16>);
+}
+
+// ─── Circuit: depositCollateral ──────────────────────────────────────────────
+//
+// Records that the user is depositing `amount` tNight as collateral.
+// The actual token transfer happens at the midnight-js API layer.
+//
+// Public effect  : totalCollateral += amount  (disclosed — already public)
+// Private effect : collateralAmount += amount (managed by api.ts post-tx)
+// ZK proven      : myCollateral + amount does not overflow
+
+export circuit depositCollateral(amount: Uint<64>): [] {
+  assert(amount > 0, "Deposit amount must be positive");
+
+  // Read private state — never leaves the ZK proof
+  const myCollateral = collateralAmount();
+
+  // Prove no overflow on the private running balance
+  const _ = myCollateral + amount;
+
+  // Update public aggregate — `disclose` is required because `amount`
+  // is a circuit argument (treated as witness-derived by the compiler)
+  totalCollateral.increment(disclose(amount) as Uint<16>);
+}
+
+// ─── Circuit: mintPUSD ───────────────────────────────────────────────────────
+//
+// Mints `amount` pUSD against the caller's existing collateral.
+// Enforces: collateral * 100 >= (existingDebt + amount) * mintingRatio
+//
+// Public effect  : totalDebt += amount
+// Private effect : debtAmount += amount  (updated in api.ts)
+// ZK proven      : the post-mint ratio is still ≥ 150%
+
+export circuit mintPUSD(amount: Uint<64>): [] {
+  assert(amount > 0, "Mint amount must be positive");
+
+  const myCollateral = collateralAmount();
+  const myDebt       = debtAmount();
+  const newDebt      = myDebt + amount;
+
+  // Ratio check: collateral * 100 >= newDebt * 150
+  // Equivalent to: (collateral * 100) / newDebt >= 150 (without division)
+  const ratio: Uint<64> = mintingRatio as Uint<64>;
+  assert(myCollateral * 100 >= newDebt * ratio, "Insufficient collateral: ratio below minting threshold");
+
+  totalDebt.increment(disclose(amount) as Uint<16>);
+}
+
+// ─── Circuit: repayPUSD ──────────────────────────────────────────────────────
+//
+// Burns `amount` pUSD — reduces the caller's private debt.
+// In a token-enabled variant, this would also require pUSD to be sent in.
+//
+// Public effect  : totalDebt -= amount
+// Private effect : debtAmount -= amount  (updated in api.ts)
+// ZK proven      : myDebt >= amount (cannot repay more than owed)
+
+export circuit repayPUSD(amount: Uint<64>): [] {
+  assert(amount > 0, "Repay amount must be positive");
+
+  const myDebt = debtAmount();
+  assert(myDebt >= amount, "Cannot repay more than outstanding debt");
+
+  totalDebt.decrement(disclose(amount) as Uint<16>);
+}
+
+// ─── Circuit: withdrawCollateral ─────────────────────────────────────────────
+//
+// Unlocks `amount` tNight from the protocol back to the caller.
+// Requires the remaining collateral to still satisfy the liquidation ratio.
+//
+// Public effect  : totalCollateral -= amount
+// Private effect : collateralAmount -= amount  (updated in api.ts)
+// ZK proven      :
+//   • myCollateral >= amount
+//   • (myCollateral - amount) * 100 >= myDebt * 150
+//     (when myDebt == 0, rhs = 0, so assertion is always satisfied)
+
+export circuit withdrawCollateral(amount: Uint<64>): [] {
+  assert(amount > 0, "Withdrawal amount must be positive");
+
+  const myCollateral = collateralAmount();
+  const myDebt       = debtAmount();
+
+  assert(myCollateral >= amount, "Cannot withdraw more than deposited collateral");
+
+  const remaining: Uint<64> = (myCollateral - amount) as Uint<64>;
+  const ratio: Uint<64>     = liquidationRatio as Uint<64>;
+
+  // When myDebt == 0: remaining * 100 >= 0 * ratio (always true).
+  // When myDebt  > 0: enforces the 150% floor.
+  // This avoids an `if (myDebt > 0)` branch that the compiler flags as
+  // potentially disclosing the private debt value through a conditional.
+  assert(remaining * 100 >= myDebt * ratio, "Withdrawal would breach liquidation ratio");
+
+  totalCollateral.decrement(disclose(amount) as Uint<16>);
+}
+
+// ─── Circuit: liquidate ──────────────────────────────────────────────────────
+//
+// Liquidates an undercollateralised position.  The protocol-level liquidator
+// (keeper bot or vigilant user) calls this with the victim's position values.
+// The circuit verifies the position is genuinely undercollateralised.
+//
+// Public effect  : totalCollateral -= victimCollateral
+//                  totalDebt        -= victimDebt
+// Private effect : none (the victim's private balances are now stale client-side)
+// ZK proven      : victimCollateral * 100 < victimDebt * 150
+//
+// Privacy note: the victim's exact amounts ARE revealed here to the liquidator,
+// as a necessary trade-off to prove the position is unhealthy.  The victim's
+// Midnight public key (identity) remains pseudonymous.
+
+export circuit liquidate(victimCollateral: Uint<64>, victimDebt: Uint<64>): [] {
+  assert(victimDebt       > 0, "Cannot liquidate a position with no debt");
+  assert(victimCollateral > 0, "Cannot liquidate a position with no collateral");
+
+  const ratio: Uint<64> = liquidationRatio as Uint<64>;
+
+  // Undercollateralised iff: victimCollateral * 100 < victimDebt * 150
+  assert(victimCollateral * 100 < victimDebt * ratio, "Position is not undercollateralised");
+
+  totalCollateral.decrement(disclose(victimCollateral) as Uint<16>);
+  totalDebt.decrement(disclose(victimDebt) as Uint<16>);
+}

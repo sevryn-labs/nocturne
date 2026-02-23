@@ -1,6 +1,7 @@
 {
-  "name": "@midnight-ntwrk/counter-cli",
+  "name": "@midnight-ntwrk/lending-cli",
   "version": "0.1.0",
+  "description": "pUSD Lending Protocol CLI — interactive terminal for Midnight Network",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
@@ -16,6 +17,6 @@
     "preprod-ps": "docker compose -f proof-server.yml pull && node --experimental-specifier-resolution=node --loader ts-node/esm src/preprod-start-proof-server.ts"
   },
   "dependencies": {
-    "@midnight-ntwrk/counter-contract": "*"
+    "@midnight-ntwrk/lending-contract": "*"
   }
 }

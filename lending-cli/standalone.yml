@@ -1,6 +1,6 @@
 services:
-  proof-server:
-    container_name: 'counter-proof-server'
+  lending-proof-server:
+    container_name: 'lending-proof-server'
     image: 'midnightntwrk/proof-server:7.0.0'
     command: ['midnight-proof-server -v']
     ports:
@@ -14,8 +14,8 @@ services:
       retries: 20
       start_period: 10s
 
-  indexer:
-    container_name: 'counter-indexer'
+  lending-indexer:
+    container_name: 'lending-indexer'
     image: 'midnightntwrk/indexer-standalone:3.0.0'
     env_file: standalone.env.example
     ports:
@@ -30,12 +30,12 @@ services:
       retries: 20
       start_period: 10s
     depends_on:
-      node:
+      lending-node:
         condition: service_healthy
 
-  node:
+  lending-node:
     image: 'midnightntwrk/midnight-node:0.20.0'
-    container_name: 'counter-node'
+    container_name: 'lending-node'
     ports:
       - '9944'
     healthcheck:

@@ -1,21 +1,61 @@
-// This file is part of midnightntwrk/example-counter.
-// Copyright (C) 2025 Midnight Foundation
-// SPDX-License-Identifier: Apache-2.0
-// Licensed under the Apache License, Version 2.0 (the "License");
-// You may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// pUSD Lending Protocol — Witness Functions
 //
-// http://www.apache.org/licenses/LICENSE-2.0
+// Witnesses bridge between the user's local private state (LevelDB)
+// and the ZK proof engine.  Each witness function receives the current
+// WitnessContext (which contains both the ledger state and private state)
+// and returns the updated private state alongside the value needed by
+// the circuit.
 //
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// These signatures MUST match the generated Witnesses<PS> type in
+// managed/lending/contract/index.d.ts.
 
-// This is how we type an empty object.
-export type CounterPrivateState = {
-  privateCounter: number;
+import { type WitnessContext } from '@midnight-ntwrk/compact-runtime';
+import { type Ledger } from './managed/lending/contract/index.js';
+
+// ─── Per-User Private State ───────────────────────────────────────────────────
+//
+// Each user's position is kept locally — never exposed on the public ledger.
+// The ZK proof certifies it satisfies the collateral constraints.
+
+export type LendingPrivateState = {
+  /** tNight deposited by this user as collateral */
+  collateralAmount: bigint;
+  /** pUSD borrowed by this user (outstanding debt) */
+  debtAmount: bigint;
 };
 
-export const witnesses = {};
+/** Zero position — used when no private state has been persisted yet */
+export const initialLendingPrivateState: LendingPrivateState = {
+  collateralAmount: 0n,
+  debtAmount: 0n,
+};
+
+// ─── Witness Functions ────────────────────────────────────────────────────────
+//
+// Compact 0.20.x witnesses are synchronous functions with the signature:
+//   (context: WitnessContext<Ledger, PS>) => [PS, returnType]
+//
+// The first element of the tuple is the (possibly updated) private state.
+// The second element is the value the circuit requested.
+//
+// In this protocol, witnesses are read-only — the private state update
+// happens explicitly in api.ts AFTER the transaction confirms, so that
+// on-chain failures do not corrupt local state.
+
+export const witnesses = {
+  /**
+   * Returns the caller's current collateral (tNight) balance.
+   * The ZK proof will verify ratio constraints against this value.
+   */
+  collateralAmount: (context: WitnessContext<Ledger, LendingPrivateState>): [LendingPrivateState, bigint] => {
+    return [context.privateState, context.privateState.collateralAmount];
+  },
+
+  /**
+   * Returns the caller's current pUSD debt balance.
+   * The ZK proof will verify repayment and ratio constraints against this.
+   */
+  debtAmount: (context: WitnessContext<Ledger, LendingPrivateState>): [LendingPrivateState, bigint] => {
+    return [context.privateState, context.privateState.debtAmount];
+  },
+};

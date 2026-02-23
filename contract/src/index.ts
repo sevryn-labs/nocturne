@@ -1,17 +1,44 @@
-// This file is part of midnightntwrk/example-counter.
-// Copyright (C) 2025 Midnight Foundation
-// SPDX-License-Identifier: Apache-2.0
-// Licensed under the Apache License, Version 2.0 (the "License");
-// You may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+// pUSD Lending Protocol — Contract Package Entry Point
 //
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Exports both flat names (for internal use) and the `Lending` namespace
+// (expected by api.ts and common-types.ts, following the midnight-js convention).
 
-export * as Counter from "./managed/counter/contract/index.js";
-export * from "./witnesses";
+// Flat re-exports (used by tests / witnesses directly)
+export {
+    Contract,
+    ledger,
+    pureCircuits,
+    contractReferenceLocations,
+} from './managed/lending/contract/index.js';
+
+export type {
+    Witnesses,
+    ImpureCircuits,
+    PureCircuits,
+    Circuits,
+    Ledger,
+    ContractReferenceLocations,
+} from './managed/lending/contract/index.js';
+
+export { witnesses, initialLendingPrivateState } from './witnesses.js';
+export type { LendingPrivateState } from './witnesses.js';
+
+// ─── Lending namespace ────────────────────────────────────────────────────────
+// api.ts, common-types.ts, and other consumers import via:
+//   import { Lending, ... } from '@midnight-ntwrk/lending-contract'
+// and then use Lending.Contract, Lending.ledger, etc.
+// This namespace provides that grouped export.
+
+import {
+    Contract,
+    ledger,
+    pureCircuits,
+    contractReferenceLocations,
+} from './managed/lending/contract/index.js';
+
+export const Lending = {
+    Contract,
+    ledger,
+    pureCircuits,
+    contractReferenceLocations,
+} as const;

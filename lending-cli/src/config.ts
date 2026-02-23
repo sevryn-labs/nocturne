@@ -1,25 +1,14 @@
-// This file is part of midnightntwrk/example-counter.
-// Copyright (C) 2025 Midnight Foundation
-// SPDX-License-Identifier: Apache-2.0
-// Licensed under the Apache License, Version 2.0 (the "License");
-// You may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-// http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// pUSD Lending Protocol — Network Configuration
 
 import path from 'node:path';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 export const currentDir = path.resolve(new URL(import.meta.url).pathname, '..');
 
 export const contractConfig = {
-  privateStateStoreName: 'counter-private-state',
-  zkConfigPath: path.resolve(currentDir, '..', '..', 'contract', 'src', 'managed', 'counter'),
+  // Name used for the LevelDB private-state database file
+  privateStateStoreName: 'lending-private-state',
+  // Path to the compiled ZK circuit assets (produced by `npm run compact` in the contract package)
+  zkConfigPath: path.resolve(currentDir, '..', '..', 'contract', 'src', 'managed', 'lending'),
 };
 
 export interface Config {
@@ -30,6 +19,7 @@ export interface Config {
   readonly proofServer: string;
 }
 
+/** Local standalone node (Docker Compose). Used for development & testing. */
 export class StandaloneConfig implements Config {
   logDir = path.resolve(currentDir, '..', 'logs', 'standalone', `${new Date().toISOString()}.log`);
   indexer = 'http://127.0.0.1:8088/api/v3/graphql';
@@ -41,6 +31,7 @@ export class StandaloneConfig implements Config {
   }
 }
 
+/** Midnight Preview testnet. Requires a local proof server (proof-server.yml). */
 export class PreviewConfig implements Config {
   logDir = path.resolve(currentDir, '..', 'logs', 'preview', `${new Date().toISOString()}.log`);
   indexer = 'https://indexer.preview.midnight.network/api/v3/graphql';
@@ -52,6 +43,7 @@ export class PreviewConfig implements Config {
   }
 }
 
+/** Midnight Preprod testnet. Requires a local proof server (proof-server.yml). */
 export class PreprodConfig implements Config {
   logDir = path.resolve(currentDir, '..', 'logs', 'preprod', `${new Date().toISOString()}.log`);
   indexer = 'https://indexer.preprod.midnight.network/api/v3/graphql';
