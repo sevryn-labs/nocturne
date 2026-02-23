@@ -77,7 +77,7 @@ globalThis.WebSocket = WebSocket;
  * managed/ directory produced by `npm run compact`.
  */
 const lendingCompiledContract = CompiledContract.make('lending', Lending.Contract).pipe(
-  CompiledContract.withVacantWitnesses,
+  CompiledContract.withWitnesses(witnesses),
   CompiledContract.withCompiledFileAssets(contractConfig.zkConfigPath),
 );
 

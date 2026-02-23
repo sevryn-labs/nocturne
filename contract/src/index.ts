@@ -27,18 +27,5 @@ export type { LendingPrivateState } from './witnesses.js';
 // api.ts, common-types.ts, and other consumers import via:
 //   import { Lending, ... } from '@midnight-ntwrk/lending-contract'
 // and then use Lending.Contract, Lending.ledger, etc.
-// This namespace provides that grouped export.
-
-import {
-    Contract,
-    ledger,
-    pureCircuits,
-    contractReferenceLocations,
-} from './managed/lending/contract/index.js';
-
-export const Lending = {
-    Contract,
-    ledger,
-    pureCircuits,
-    contractReferenceLocations,
-} as const;
+// This namespace provides those grouped exports for both values and types.
+export * as Lending from './managed/lending/contract/index.js';
