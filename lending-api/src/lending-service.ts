@@ -498,10 +498,10 @@ export class LendingService {
 
         return {
             seed: this.seed!,
-            network: networkId,
-            unshieldedAddress: this.walletCtx!.unshieldedKeystore.getBech32Address(),
+            network: String(networkId),
+            unshieldedAddress: this.walletCtx!.unshieldedKeystore.getBech32Address().toString(),
             shieldedAddress,
-            dustAddress: state.dust.dustAddress ?? '',
+            dustAddress: state.dust.dustAddress?.toString() ?? '',
             unshieldedBalance: unshieldedBalance.toString(),
             dustBalance: dustBalance.toString(),
             isSynced: state.isSynced,

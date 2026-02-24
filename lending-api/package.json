@@ -6,7 +6,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "dev": "node --experimental-specifier-resolution=node --loader ts-node/esm src/server.ts",
+        "dev": "tsx src/server.ts",
         "build": "rm -rf dist && tsc --project tsconfig.build.json",
         "start": "node dist/server.js",
         "typecheck": "tsc -p tsconfig.json --noEmit"

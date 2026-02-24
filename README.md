@@ -14,11 +14,15 @@ A **privacy-preserving collateralised lending protocol** built on the [Midnight 
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
+- [Quick Start — Web UI](#quick-start--web-ui)
+- [Quick Start — CLI](#quick-start--cli)
+- [Web Frontend Features](#web-frontend-features)
+- [API Endpoints](#api-endpoints)
 - [Using the CLI](#using-the-lending-protocol-cli)
 - [Running Tests](#running-tests)
 - [Standalone Mode](#standalone-mode-fully-local)
 - [Network Targets](#network-targets)
+- [Environment Variables](#environment-variables)
 - [Troubleshooting](#troubleshooting)
 - [Further Reading](#further-reading)
 
@@ -64,14 +68,24 @@ Private state lives in a user-controlled local LevelDB database and is supplied 
 
 ## Architecture
 
+The protocol supports two interaction modes — a **React Web UI** and a **terminal CLI** — both backed by the same contract and wallet SDK:
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CLI (cli.ts)                             │
-│  Menu-driven terminal: wallet setup → contract → lending ops    │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-┌──────────────────────────────▼──────────────────────────────────┐
-│                      TypeScript API (api.ts)                     │
+┌──────────────────────┐    ┌─────────────────────────────────────┐
+│  React Web UI        │    │           CLI (cli.ts)               │
+│  (lending-ui)        │    │  Menu-driven terminal interface      │
+│  localhost:5173      │    └──────────────────┬──────────────────┘
+└──────────┬───────────┘                       │
+           │ HTTP/JSON                         │ direct import
+┌──────────▼───────────┐                       │
+│  REST API Server     │                       │
+│  (lending-api)       ├───────────────────────┤
+│  localhost:3001      │                       │
+│  Express + LendingService                    │
+└──────────┬───────────┘                       │
+           │                                   │
+┌──────────▼───────────────────────────────────▼──────────────────┐
+│                      TypeScript API (api.ts / lending-service)   │
 │  Wallet construction · Provider setup · All 5 lending ops        │
 │  Private state management (LevelDB read/write)                   │
 └────┬──────────────┬──────────────┬──────────────┬───────────────┘
@@ -120,7 +134,31 @@ lending_protocol/
 │       ├── lending-simulator.ts           # In-memory test harness (no network)
 │       └── lending.test.ts                # 30 unit tests (vitest)
 │
-├── lending-cli/                           # CLI & API layer
+├── lending-api/                           # REST API server (NEW)
+│   ├── package.json                       # @midnight-ntwrk/lending-api
+│   └── src/
+│       ├── server.ts                      # Express server (port 3001)
+│       ├── lending-service.ts             # Core service: wallet, contract, operations
+│       ├── config.ts                      # Network configs (mirrors lending-cli)
+│       └── common-types.ts                # Shared types
+│
+├── lending-ui/                            # React web frontend (NEW)
+│   ├── package.json                       # @midnight-ntwrk/lending-ui
+│   ├── index.html                         # Entry HTML
+│   ├── vite.config.ts                     # Vite + API proxy config
+│   └── src/
+│       ├── main.tsx                       # React entry point
+│       ├── App.tsx                        # Root component + routing
+│       ├── api.ts                         # Typed HTTP client for lending-api
+│       ├── context.tsx                    # React Context for global state
+│       ├── index.css                      # Design system (dark theme, glassmorphism)
+│       └── pages/
+│           ├── Setup.tsx                  # Wallet init + contract deploy/join
+│           ├── Dashboard.tsx              # Public protocol state
+│           ├── Position.tsx               # Private position + health indicator
+│           └── Actions.tsx                # Deposit/Mint/Repay/Withdraw/Liquidate
+│
+├── lending-cli/                           # CLI & API layer (original)
 │   ├── package.json                       # @midnight-ntwrk/lending-cli
 │   ├── .env                               # Indexer container env vars
 │   ├── standalone.yml                     # Docker Compose: full local stack
@@ -175,7 +213,9 @@ compact compile --version
 
 ---
 
-## Quick Start
+## Quick Start — Web UI
+
+The recommended way to interact with the lending protocol is via the **React Web UI**.
 
 ### 1. Install dependencies
 
@@ -204,7 +244,55 @@ Expected output from `npm run compact`:
 
 > The first run downloads zero-knowledge parameters (~500 MB). This is a one-time download cached at `~/.compact/`.
 
-### 3. Launch the CLI
+### 3. Start the Proof Server
+
+```bash
+cd lending-cli && docker compose -f proof-server.yml up -d
+```
+
+Wait until it shows `listening on 0.0.0.0:6300` in the logs.
+
+### 4. Start the API Server
+
+```bash
+# From the project root
+npm run dev:api
+```
+
+The REST API server starts on **http://localhost:3001**. You should see:
+
+```
+[lending-api] Network: preprod | Port: 3001
+[lending-api] Server running at http://localhost:3001
+```
+
+### 5. Start the Web Frontend
+
+In a second terminal:
+
+```bash
+# From the project root
+npm run dev:ui
+```
+
+Open **http://localhost:5173** in your browser. The Vite dev server proxies API requests to the backend automatically.
+
+### 6. Use the Protocol
+
+1. **Setup page** → Click "Create New Wallet" (or restore from seed)
+2. Fund your wallet with tNight from the [Preprod Faucet](https://faucet.preprod.midnight.network)
+3. **Setup page** → Click "Deploy New Contract" (or join an existing one)
+4. **Dashboard** → View public protocol state
+5. **My Position** → View your private collateral and debt
+6. **Actions** → Deposit, Mint, Repay, Withdraw, or Liquidate
+
+> ⏱ Wallet initialization takes 30–60 seconds (sync + DUST registration). Contract deployment takes 1–3 minutes (ZK proof generation).
+
+---
+
+## Quick Start — CLI
+
+The original terminal CLI is still fully functional.
 
 **Option A — Preprod with auto-start proof server (recommended for first run):**
 
@@ -354,6 +442,71 @@ Formula: `maxDebt = (collateral × 100) / 150`
 
 ---
 
+## Web Frontend Features
+
+The React UI (`lending-ui/`) provides four pages:
+
+| Page | Route | Description |
+|------|-------|-------------|
+| **Setup** | `/setup` | Wallet initialization (new or restore), contract deploy/join |
+| **Dashboard** | `/dashboard` | Public protocol state: total collateral, total debt, ratios, utilization |
+| **My Position** | `/position` | Private state with health indicator (Green ≥170% / Yellow 150–170% / Red <150%) |
+| **Actions** | `/actions` | Tabbed forms for Deposit, Mint, Repay, Withdraw, Liquidate |
+
+### UX Highlights
+
+- **Live Ratio Preview** — When typing amounts in mint/withdraw/deposit/repay forms, the new collateral ratio is calculated and displayed instantly with color-coded health warnings
+- **Health Indicator** — Color-coded badge (🛡 Healthy / ⚠️ At Risk / 🚨 Critical) with animated ratio bar and liquidation threshold markers
+- **ZK Proof Feedback** — Loading states with estimated timing for proof generation
+- **Error Classification** — Errors are categorized (`WALLET_NOT_INITIALIZED`, `INSUFFICIENT_BALANCE`, `PROOF_SERVER_DOWN`, etc.) and displayed with user-friendly messages
+- **Auto-Refresh** — Protocol state refreshes every 30 seconds; position refreshes after every action
+- **Premium Dark Theme** — Glassmorphism, gradient accents, Inter + JetBrains Mono typography, micro-animations
+
+---
+
+## API Endpoints
+
+The REST API server (`lending-api/`) exposes the following endpoints on **http://localhost:3001**:
+
+### Wallet
+
+| Method | Endpoint | Body | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/wallet/initialize` | `{ seed?: string }` | Create or restore wallet |
+| `GET` | `/api/wallet/info` | — | Get wallet balances and addresses |
+| `POST` | `/api/wallet/wait-for-funds` | — | Block until tNight balance > 0 |
+| `POST` | `/api/wallet/register-dust` | — | Register for DUST generation |
+| `GET` | `/api/wallet/dust` | — | Get DUST balance |
+
+### Contract
+
+| Method | Endpoint | Body | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/contract/deploy` | — | Deploy a new lending contract |
+| `POST` | `/api/contract/join` | `{ address: string }` | Join existing contract |
+
+### State
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/protocol/state` | Public protocol state (totals, ratios) |
+| `GET` | `/api/position` | Private position (collateral, debt, ratio) |
+| `GET` | `/api/health` | Server health + connection status |
+
+### Lending Actions
+
+| Method | Endpoint | Body | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/actions/deposit` | `{ amount: string }` | Deposit tNight collateral |
+| `POST` | `/api/actions/mint` | `{ amount: string }` | Mint pUSD |
+| `POST` | `/api/actions/repay` | `{ amount: string }` | Repay pUSD debt |
+| `POST` | `/api/actions/withdraw` | `{ amount: string }` | Withdraw tNight |
+| `POST` | `/api/actions/liquidate` | `{ victimCollateral, victimDebt }` | Liquidate undercollateralised position |
+
+All responses use JSON. BigInt values are serialized as strings. Errors include an `errorType` field for frontend categorization.
+
+---
+
 ## Running Tests
 
 ```bash
@@ -413,6 +566,29 @@ cd lending-cli && docker compose -f proof-server.yml up -d
 
 ---
 
+## Environment Variables
+
+| Variable | Default | Used By | Description |
+|----------|---------|---------|-------------|
+| `MIDNIGHT_NETWORK` | `preprod` | `lending-api` | Network to connect to: `standalone`, `preview`, or `preprod` |
+| `PORT` | `3001` | `lending-api` | HTTP port for the REST API server |
+
+Example:
+
+```bash
+MIDNIGHT_NETWORK=standalone PORT=4000 npm run dev:api
+```
+
+### Root Workspace Scripts
+
+| Script | Description |
+|--------|-------------|
+| `npm run dev:api` | Start the REST API server (port 3001) |
+| `npm run dev:ui` | Start the React dev server (port 5173) |
+| `npm run dev:cli` | Start the CLI in standalone mode |
+
+---
+
 ## Troubleshooting
 
 | Issue | Solution |
@@ -441,6 +617,11 @@ cd lending-cli && docker compose -f proof-server.yml up -d
 | `@midnight-ntwrk/wallet-sdk-facade` | 1.0.0 | Unified wallet interface |
 | `@midnight-ntwrk/wallet-sdk-hd` | 3.0.0 | HD key derivation |
 | `@midnight-ntwrk/ledger-v7` (via `@midnight-ntwrk/ledger`) | ^4.0.0 | Ledger types & primitives |
+| `express` | ^5.1.0 | REST API framework (lending-api) |
+| `react` | ^19.0.0 | UI framework (lending-ui) |
+| `react-router-dom` | ^7.1.0 | Client-side routing |
+| `vite` | ^6.0.0 | Frontend build tool |
+| `tsx` | ^4.21.0 | TypeScript execution (Node v24 compatible) |
 | `pino` | ^10.3.1 | Structured logging |
 | `testcontainers` | ^11.12.0 | Docker management for standalone mode |
 
