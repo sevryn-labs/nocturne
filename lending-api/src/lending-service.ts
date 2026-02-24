@@ -304,7 +304,7 @@ export class LendingService {
             collateralAmount: s.collateralAmount + amount,
         }));
 
-        return { txHash: txData.public.txHash, blockHeight: txData.public.blockHeight };
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 
     async mint(amount: bigint): Promise<TxResult> {
@@ -318,7 +318,7 @@ export class LendingService {
             debtAmount: s.debtAmount + amount,
         }));
 
-        return { txHash: txData.public.txHash, blockHeight: txData.public.blockHeight };
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 
     async repay(amount: bigint): Promise<TxResult> {
@@ -338,7 +338,7 @@ export class LendingService {
             debtAmount: s.debtAmount - amount,
         }));
 
-        return { txHash: txData.public.txHash, blockHeight: txData.public.blockHeight };
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 
     async withdraw(amount: bigint): Promise<TxResult> {
@@ -358,7 +358,7 @@ export class LendingService {
             collateralAmount: s.collateralAmount - amount,
         }));
 
-        return { txHash: txData.public.txHash, blockHeight: txData.public.blockHeight };
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 
     async liquidate(victimCollateral: bigint, victimDebt: bigint): Promise<TxResult> {
@@ -373,7 +373,7 @@ export class LendingService {
 
         const txData = await this.contract!.callTx.liquidate(victimCollateral, victimDebt);
 
-        return { txHash: txData.public.txHash, blockHeight: txData.public.blockHeight };
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 
     // ─── Private Helpers ─────────────────────────────────────────────────────

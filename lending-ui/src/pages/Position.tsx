@@ -1,9 +1,10 @@
 // pUSD Lending Protocol — My Position Page
-// Shows private state: collateral, debt, health, and ratio visualization.
+// Shows private position details and health metrics.
 
 import React, { useEffect } from 'react';
 import { useApp } from '../context.tsx';
 import { useNavigate } from 'react-router-dom';
+import { RiskBar, Tooltip } from '../components/UI.tsx';
 
 export const Position: React.FC = () => {
     const { state, actions } = useApp();
@@ -12,10 +13,7 @@ export const Position: React.FC = () => {
     useEffect(() => {
         if (!state.wallet || !state.contractAddress) {
             navigate('/setup');
-            return;
         }
-        actions.refreshPosition();
-        actions.refreshProtocol();
     }, [state.wallet, state.contractAddress]);
 
     const position = state.position;
@@ -23,186 +21,124 @@ export const Position: React.FC = () => {
 
     const collateral = position ? BigInt(position.collateralAmount) : 0n;
     const debt = position ? BigInt(position.debtAmount) : 0n;
-    const ratio = position ? Number(BigInt(position.collateralRatio)) : 0;
-    const isLiquidatable = position?.isLiquidatable ?? false;
 
-    const liquidationRatio = protocol ? Number(BigInt(protocol.liquidationRatio)) : 150;
-    const mintingRatio = protocol ? Number(BigInt(protocol.mintingRatio)) : 150;
+    const ratio = debt > 0n
+        ? Number((collateral * 100n) / debt)
+        : collateral > 0n ? Infinity : 0;
+
+    const liquidationRatio = protocol ? Number(protocol.liquidationRatio) : 150;
+    const mintingRatio = protocol ? Number(protocol.mintingRatio) : 150;
 
     // Max additional pUSD that can be minted
-    const maxMintable = collateral > 0n && BigInt(mintingRatio) > 0n
+    const maxMintable = collateral > 0n && mintingRatio > 0
         ? (collateral * 100n) / BigInt(mintingRatio) - debt
         : 0n;
 
     // Max collateral that can be withdrawn (while keeping ratio ≥ liquidation)
-    const maxWithdrawable = debt > 0n && BigInt(liquidationRatio) > 0n
+    const maxWithdrawable = debt > 0n && liquidationRatio > 0
         ? collateral - (debt * BigInt(liquidationRatio)) / 100n
         : collateral;
 
-    const healthLabel = getHealthLabel(ratio, debt > 0n);
-    const healthClass = getHealthClass(ratio, debt > 0n);
+    const getHealthClass = (r: number) => {
+        if (debt === 0n || r === Infinity || r >= 170) return 'status-green';
+        if (r >= 150) return 'status-yellow';
+        return 'status-red';
+    };
+
+    const getHealthLabel = (r: number) => {
+        if (debt === 0n) return 'No Position';
+        if (r === Infinity || r >= 170) return 'Healthy';
+        if (r >= 150) return 'At Risk';
+        return 'Liquidatable';
+    };
 
     return (
-        <div className="animate-in">
-            <div className="page-header">
-                <h1 className="page-title">My Position</h1>
-                <p className="page-subtitle">
-                    Your private lending position — stored locally, proven via ZK.
-                    This data never leaves your machine.
+        <div className="animate-fade-in">
+            <header className="page-header" style={{ marginBottom: '40px' }}>
+                <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>My Position</h1>
+                <p style={{ color: 'var(--text-secondary)' }}>
+                    Your private position data is collateralised by ZK proofs. Only you can see these amounts.
                 </p>
-            </div>
+            </header>
 
-            {/* Health Banner */}
-            {position && debt > 0n && (
-                <div className={`card animate-in`} style={{ marginBottom: '1rem', borderColor: getHealthBorderColor(healthClass) }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-                                <span className={`health-badge ${healthClass}`}>
-                                    {healthClass === 'healthy' ? '🛡' : healthClass === 'warning' ? '⚠️' : '🚨'} {healthLabel}
-                                </span>
-                                {isLiquidatable && (
-                                    <span className="health-badge danger">LIQUIDATABLE</span>
-                                )}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
+                <div style={{ display: 'grid', gap: '32px' }}>
+                    {/* Main Stats Card */}
+                    <div className="card">
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                            <div className="stat-card">
+                                <Tooltip label="My Collateral" content="Total tNight tokens you have locked in this position." />
+                                <div className="stat-value" style={{ fontSize: '32px' }}>
+                                    {collateral.toLocaleString()} <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>tN</span>
+                                </div>
                             </div>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                                Collateral ratio: {ratio}% | Liquidation threshold: {liquidationRatio}%
-                            </span>
-                        </div>
-                        <div style={{ textAlign: 'right' }}>
-                            <div style={{ fontSize: '2rem', fontWeight: 700, fontFamily: 'var(--font-mono)', color: getRatioColor(ratio) }}>
-                                {ratio}%
+                            <div className="stat-card">
+                                <Tooltip label="My Debt" content="Total pUSD you have borrowed against your collateral." />
+                                <div className="stat-value" style={{ fontSize: '32px', color: 'var(--accent-secondary)' }}>
+                                    {debt.toLocaleString()} <span style={{ fontSize: '14px', color: 'var(--text-muted)' }}>pUSD</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Ratio Bar */}
-                    <div className="ratio-bar-container">
-                        <div className="ratio-bar-labels">
-                            <span>0%</span>
-                            <span style={{ color: 'var(--health-red)' }}>150%</span>
-                            <span style={{ color: 'var(--health-yellow)' }}>170%</span>
-                            <span>300%+</span>
-                        </div>
-                        <div className="ratio-bar">
-                            <div
-                                className={`ratio-bar-fill ${healthClass}`}
-                                style={{ width: `${Math.min(ratio / 3, 100)}%` }}
-                            />
-                            {/* Liquidation threshold marker */}
-                            <div className="ratio-bar-threshold" style={{ left: `${(liquidationRatio / 3)}%` }} />
-                            {/* Warning threshold marker */}
-                            <div className="ratio-bar-threshold" style={{ left: `${(170 / 3)}%`, background: 'var(--health-yellow)', opacity: 0.4 }} />
+                        <div className="glass-panel" style={{ marginTop: '32px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', alignItems: 'center' }}>
+                                <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-secondary)' }}>Health Factor</span>
+                                <div className={`health-status ${getHealthClass(ratio)}`}>
+                                    {getHealthLabel(ratio)}
+                                </div>
+                            </div>
+                            <RiskBar ratio={ratio} />
                         </div>
                     </div>
-                </div>
-            )}
 
-            {/* Position Stats */}
-            <div className="stat-grid">
-                <div className="card stat-card animate-in">
-                    <div className="stat-label">Collateral Deposited</div>
-                    {state.positionLoading && !position ? (
-                        <div className="skeleton skeleton-value" />
-                    ) : (
-                        <div className="stat-value">
-                            {collateral.toLocaleString()}
-                            <span className="stat-suffix">tNight</span>
+                    {/* Technical Limits Card */}
+                    <div className="card">
+                        <h3 style={{ fontSize: '18px', marginBottom: '24px' }}>Technical Limits</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                            <div>
+                                <div className="stat-label" style={{ fontSize: '12px' }}>Max Additional Mint</div>
+                                <div style={{ fontSize: '20px', fontWeight: 600, marginTop: '8px' }}>
+                                    {maxMintable > 0n ? maxMintable.toLocaleString() : '0'} <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>pUSD</span>
+                                </div>
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Based on {mintingRatio}% Minting Ratio</p>
+                            </div>
+                            <div>
+                                <div className="stat-label" style={{ fontSize: '12px' }}>Max Safe Withdrawal</div>
+                                <div style={{ fontSize: '20px', fontWeight: 600, marginTop: '8px' }}>
+                                    {maxWithdrawable > 0n ? maxWithdrawable.toLocaleString() : '0'} <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>tN</span>
+                                </div>
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>Based on {liquidationRatio}% Liq. Ratio</p>
+                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
 
-                <div className="card stat-card animate-in">
-                    <div className="stat-label">Debt Outstanding</div>
-                    {state.positionLoading && !position ? (
-                        <div className="skeleton skeleton-value" />
-                    ) : (
-                        <div className="stat-value accent">
-                            {debt.toLocaleString()}
-                            <span className="stat-suffix">pUSD</span>
+                <div style={{ display: 'grid', gap: '32px', gridAutoRows: 'min-content' }}>
+                    <div className="card glass-panel" style={{ border: '1px solid var(--accent-primary-glow)' }}>
+                        <h3 style={{ fontSize: '16px', marginBottom: '16px', color: 'var(--accent-primary)' }}>Quick Actions</h3>
+                        <div style={{ display: 'grid', gap: '12px' }}>
+                            <button className="btn btn-primary" onClick={() => navigate('/actions')}>Manage Liquidity</button>
+                            <button className="btn btn-ghost" onClick={() => navigate('/dashboard')}>Back to Stats</button>
                         </div>
-                    )}
-                </div>
+                    </div>
 
-                <div className="card stat-card animate-in">
-                    <div className="stat-label">Available to Mint</div>
-                    <div className="stat-value" style={{ color: maxMintable > 0n ? 'var(--accent-secondary)' : 'var(--text-muted)' }}>
-                        {maxMintable > 0n ? maxMintable.toLocaleString() : '0'}
-                        <span className="stat-suffix">pUSD</span>
+                    <div className="card" style={{ background: 'transparent' }}>
+                        <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>ZK Privacy Status</h3>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', marginBottom: '16px' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-success)', marginTop: '6px' }}></div>
+                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                                Amounts are obfuscated on-chain using <strong>Pedersen Commitments</strong>.
+                            </p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                            <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--status-success)', marginTop: '6px' }}></div>
+                            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                                Position solvency proven via <strong>Halo2</strong> zero-knowledge proofs.
+                            </p>
+                        </div>
                     </div>
                 </div>
-
-                <div className="card stat-card animate-in">
-                    <div className="stat-label">Available to Withdraw</div>
-                    <div className="stat-value" style={{ color: maxWithdrawable > 0n ? 'var(--health-green)' : 'var(--text-muted)' }}>
-                        {maxWithdrawable > 0n ? maxWithdrawable.toLocaleString() : '0'}
-                        <span className="stat-suffix">tNight</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Privacy Note */}
-            <div className="card animate-in">
-                <div className="card-header">
-                    <div className="card-title">
-                        <span className="icon">🔒</span>
-                        Privacy Note
-                    </div>
-                    <button
-                        className="btn btn-secondary"
-                        onClick={() => {
-                            actions.refreshPosition();
-                            actions.refreshProtocol();
-                        }}
-                        disabled={state.positionLoading}
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                    >
-                        {state.positionLoading ? <span className="spinner" /> : '↻ Refresh'}
-                    </button>
-                </div>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                    Your collateral and debt amounts are stored in your <strong>local LevelDB</strong> database — they are
-                    never revealed on-chain. When you perform lending actions, the Compact contract uses
-                    <strong> zero-knowledge proofs </strong> to verify constraints (e.g., collateral ratio ≥ {liquidationRatio}%)
-                    without disclosing your actual position to anyone.
-                </p>
-            </div>
-
-            {/* Quick Actions */}
-            <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-                <button className="btn btn-primary" onClick={() => navigate('/actions')}>
-                    💰 Lending Actions
-                </button>
-                <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>
-                    📊 Protocol Dashboard
-                </button>
             </div>
         </div>
     );
 };
-
-function getHealthLabel(ratio: number, hasDebt: boolean): string {
-    if (!hasDebt) return 'No Debt';
-    if (ratio >= 170) return 'Healthy';
-    if (ratio >= 150) return 'At Risk';
-    return 'Critical';
-}
-
-function getHealthClass(ratio: number, hasDebt: boolean): string {
-    if (!hasDebt) return 'healthy';
-    if (ratio >= 170) return 'healthy';
-    if (ratio >= 150) return 'warning';
-    return 'danger';
-}
-
-function getRatioColor(ratio: number): string {
-    if (ratio >= 170) return 'var(--health-green)';
-    if (ratio >= 150) return 'var(--health-yellow)';
-    return 'var(--health-red)';
-}
-
-function getHealthBorderColor(healthClass: string): string {
-    if (healthClass === 'healthy') return 'rgba(0, 184, 148, 0.2)';
-    if (healthClass === 'warning') return 'rgba(253, 203, 110, 0.3)';
-    return 'rgba(225, 112, 85, 0.3)';
-}

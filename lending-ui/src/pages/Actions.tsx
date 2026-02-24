@@ -1,16 +1,17 @@
 // pUSD Lending Protocol — Actions Page
-// Forms for all lending operations with live ratio preview.
+// Card-based interface for all lending operations.
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useApp } from '../context.tsx';
 import { useNavigate } from 'react-router-dom';
+import { Tooltip, RiskBar } from '../components/UI.tsx';
 
 type ActionTab = 'deposit' | 'mint' | 'repay' | 'withdraw' | 'liquidate';
 
 export const Actions: React.FC = () => {
     const { state, actions } = useApp();
     const navigate = useNavigate();
-    const [tab, setTab] = useState<ActionTab>('deposit');
+    const [selectedAction, setSelectedAction] = useState<ActionTab | null>(null);
 
     // Form state
     const [amount, setAmount] = useState('');
@@ -26,270 +27,190 @@ export const Actions: React.FC = () => {
         actions.refreshProtocol();
     }, [state.wallet, state.contractAddress]);
 
-    // Current position
     const collateral = state.position ? BigInt(state.position.collateralAmount) : 0n;
     const debt = state.position ? BigInt(state.position.debtAmount) : 0n;
-    const liquidationRatio = state.protocol ? BigInt(state.protocol.liquidationRatio) : 150n;
+    const liquidationRatio = state.protocol ? Number(state.protocol.liquidationRatio) : 150;
 
-    // Live ratio preview
+    const currentRatio = debt > 0n
+        ? Number((collateral * 100n) / debt)
+        : collateral > 0n ? Infinity : 0;
+
     const previewRatio = useMemo(() => {
         const amtBig = parseBigInt(amount);
-        if (amtBig <= 0n) return null;
+        if (amtBig <= 0n || !selectedAction) return null;
 
         let newCollateral = collateral;
         let newDebt = debt;
 
-        switch (tab) {
-            case 'deposit':
-                newCollateral = collateral + amtBig;
-                break;
-            case 'mint':
-                newDebt = debt + amtBig;
-                break;
-            case 'repay':
-                newDebt = debt - amtBig;
-                if (newDebt < 0n) newDebt = 0n;
-                break;
-            case 'withdraw':
-                newCollateral = collateral - amtBig;
-                if (newCollateral < 0n) newCollateral = 0n;
-                break;
-            default:
-                return null;
+        switch (selectedAction) {
+            case 'deposit': newCollateral = collateral + amtBig; break;
+            case 'mint': newDebt = debt + amtBig; break;
+            case 'repay': newDebt = debt - amtBig; if (newDebt < 0n) newDebt = 0n; break;
+            case 'withdraw': newCollateral = collateral - amtBig; if (newCollateral < 0n) newCollateral = 0n; break;
+            default: return null;
         }
 
         if (newDebt === 0n) return { ratio: Infinity, safe: true };
         const ratio = Number((newCollateral * 100n) / newDebt);
-        return { ratio, safe: ratio >= Number(liquidationRatio) };
-    }, [amount, tab, collateral, debt, liquidationRatio]);
+        return { ratio, safe: ratio >= liquidationRatio };
+    }, [amount, selectedAction, collateral, debt, liquidationRatio]);
 
     const handleSubmit = async () => {
-        if (tab === 'liquidate') {
+        if (!selectedAction) return;
+        if (selectedAction === 'liquidate') {
             await actions.liquidate(victimCollateral, victimDebt);
         } else {
-            const actionFn = { deposit: actions.deposit, mint: actions.mint, repay: actions.repay, withdraw: actions.withdraw }[tab];
+            const actionFn = { deposit: actions.deposit, mint: actions.mint, repay: actions.repay, withdraw: actions.withdraw }[selectedAction];
             await actionFn(amount);
         }
         setAmount('');
         setVictimCollateral('');
         setVictimDebt('');
+        setSelectedAction(null);
     };
 
-    const canSubmit = tab === 'liquidate'
-        ? (parseBigInt(victimCollateral) > 0n && parseBigInt(victimDebt) > 0n)
-        : parseBigInt(amount) > 0n;
-
-    const tabs: { key: ActionTab; label: string; icon: string; color: string }[] = [
-        { key: 'deposit', label: 'Deposit', icon: '📥', color: 'var(--health-green)' },
-        { key: 'mint', label: 'Mint', icon: '🪙', color: 'var(--accent-secondary)' },
-        { key: 'repay', label: 'Repay', icon: '💸', color: 'var(--accent-primary)' },
-        { key: 'withdraw', label: 'Withdraw', icon: '📤', color: 'var(--health-yellow)' },
-        { key: 'liquidate', label: 'Liquidate', icon: '⚡', color: 'var(--health-red)' },
+    const actionCards: { key: ActionTab; label: string; desc: string; icon: string; tooltip: string }[] = [
+        {
+            key: 'deposit',
+            label: 'Deposit Collateral',
+            desc: 'Lock tNight to enable borrowing.',
+            icon: '📥',
+            tooltip: 'Locking more collateral improves your health factor and allows you to mint more pUSD.'
+        },
+        {
+            key: 'mint',
+            label: 'Mint pUSD',
+            desc: 'Borrow synthetic credit against your collateral.',
+            icon: '🪙',
+            tooltip: 'Minting pUSD increases your debt. Ensure your ratio stays above 150%.'
+        },
+        {
+            key: 'repay',
+            label: 'Repay pUSD',
+            desc: 'Reduce your debt and improve your health factor.',
+            icon: '💸',
+            tooltip: 'Repaying pUSD removes debt from your position, making it safer from liquidation.'
+        },
+        {
+            key: 'withdraw',
+            label: 'Withdraw Collateral',
+            desc: 'Reclaim tNight if your ratio remains safe.',
+            icon: '📤',
+            tooltip: 'You can only withdraw collateral if your remaining ratio stays above 150%.'
+        },
+        {
+            key: 'liquidate',
+            label: 'Liquidate',
+            desc: 'Close an undercollateralised position and claim collateral.',
+            icon: '⚡',
+            tooltip: 'Liquidation is a public action to maintain protocol health. Requires repaying the victim\'s debt.'
+        },
     ];
 
     return (
-        <div className="animate-in">
-            <div className="page-header">
-                <h1 className="page-title">Lending Actions</h1>
-                <p className="page-subtitle">
-                    Manage your lending position. All operations generate zero-knowledge proofs locally.
+        <div className="animate-fade-in">
+            <header className="page-header" style={{ marginBottom: '40px' }}>
+                <h1 style={{ fontSize: '32px', marginBottom: '8px' }}>Actions</h1>
+                <p style={{ color: 'var(--text-secondary)' }}>
+                    All lending operations generate zero-knowledge proofs locally on your machine.
                 </p>
-            </div>
+            </header>
 
-            {/* Current Position Summary */}
-            <div className="stat-grid" style={{ marginBottom: '1.5rem' }}>
-                <div className="card stat-card">
-                    <div className="stat-label">My Collateral</div>
-                    <div className="stat-value">{collateral.toLocaleString()} <span className="stat-suffix">tNight</span></div>
-                </div>
-                <div className="card stat-card">
-                    <div className="stat-label">My Debt</div>
-                    <div className="stat-value accent">{debt.toLocaleString()} <span className="stat-suffix">pUSD</span></div>
-                </div>
-                <div className="card stat-card">
-                    <div className="stat-label">Current Ratio</div>
-                    <div className="stat-value" style={{ color: debt > 0n ? getRatioColor(Number((collateral * 100n) / debt)) : 'var(--text-muted)' }}>
-                        {debt > 0n ? `${Number((collateral * 100n) / debt)}%` : '∞'}
-                    </div>
-                </div>
-            </div>
-
-            {/* Tab Navigation */}
-            <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.5rem', overflowX: 'auto' }}>
-                {tabs.map((t) => (
-                    <button
-                        key={t.key}
-                        id={`tab-${t.key}`}
-                        className={`btn ${tab === t.key ? 'btn-primary' : 'btn-secondary'}`}
-                        onClick={() => { setTab(t.key); setAmount(''); actions.clearActionError(); }}
-                        style={{
-                            flex: 1,
-                            minWidth: 'fit-content',
-                            ...(tab === t.key ? { boxShadow: `0 0 20px ${t.color}33` } : {}),
-                        }}
-                    >
-                        {t.icon} {t.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Action Form */}
-            <div className="card card-highlight animate-in" style={{ maxWidth: '560px' }}>
-                <div className="card-header">
-                    <div className="card-title">
-                        <span className="icon">{tabs.find(t => t.key === tab)?.icon}</span>
-                        {tabs.find(t => t.key === tab)?.label}
-                    </div>
-                </div>
-
-                {/* Error / Success */}
-                {state.actionError && (
-                    <div className="alert alert-error">⚠ {state.actionError}</div>
-                )}
-                {state.lastTxHash && (
-                    <div className="alert alert-success">
-                        ✅ Transaction confirmed!
-                        <span className="tx-hash" style={{ marginLeft: '0.5rem' }}>
-                            TX: {state.lastTxHash}
-                        </span>
-                    </div>
-                )}
-
-                {tab !== 'liquidate' ? (
-                    <>
-                        <div className="form-group">
-                            <label className="form-label">
-                                {tab === 'deposit' ? 'Collateral Amount (tNight)' :
-                                    tab === 'mint' ? 'Mint Amount (pUSD)' :
-                                        tab === 'repay' ? 'Repay Amount (pUSD)' :
-                                            'Withdrawal Amount (tNight)'}
-                            </label>
-                            <input
-                                id={`input-${tab}`}
-                                className="form-input"
-                                type="text"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
-                                placeholder="Enter amount..."
-                                disabled={state.actionLoading}
-                                autoFocus
-                            />
-                            {tab === 'repay' && debt > 0n && (
-                                <div className="form-hint">
-                                    Max: {debt.toLocaleString()} pUSD |
-                                    <button
-                                        style={{ background: 'none', border: 'none', color: 'var(--accent-primary)', cursor: 'pointer', fontSize: '0.75rem', marginLeft: '0.25rem' }}
-                                        onClick={() => setAmount(debt.toString())}
-                                    >
-                                        Repay All
-                                    </button>
-                                </div>
-                            )}
-                            {tab === 'withdraw' && collateral > 0n && (
-                                <div className="form-hint">
-                                    Max safe withdrawal depends on your debt and liquidation ratio.
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Live Preview */}
-                        {previewRatio !== null && (
-                            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-md)', border: `1px solid ${previewRatio.safe ? 'var(--border-subtle)' : 'rgba(225, 112, 85, 0.3)'}` }}>
-                                <div className="preview-row">
-                                    <span className="preview-label">New Collateral Ratio</span>
-                                    <span className="preview-value" style={{ color: previewRatio.ratio === Infinity ? 'var(--health-green)' : getRatioColor(previewRatio.ratio) }}>
-                                        {previewRatio.ratio === Infinity ? '∞' : `${previewRatio.ratio}%`}
-                                    </span>
-                                </div>
-                                {!previewRatio.safe && (
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--health-red)', marginTop: '0.25rem' }}>
-                                        ⚠ This action would breach the {Number(liquidationRatio)}% liquidation ratio
-                                    </div>
-                                )}
-                                {previewRatio.safe && previewRatio.ratio !== Infinity && previewRatio.ratio < 170 && (
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--health-yellow)', marginTop: '0.25rem' }}>
-                                        ⚠ Ratio would be below 170% — position would be at risk
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <>
-                        <div className="form-group">
-                            <label className="form-label">Victim's Collateral (tNight)</label>
-                            <input
-                                id="input-victim-collateral"
-                                className="form-input"
-                                type="text"
-                                value={victimCollateral}
-                                onChange={(e) => setVictimCollateral(e.target.value.replace(/[^0-9]/g, ''))}
-                                placeholder="Enter victim's collateral amount..."
-                                disabled={state.actionLoading}
-                            />
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label">Victim's Debt (pUSD)</label>
-                            <input
-                                id="input-victim-debt"
-                                className="form-input"
-                                type="text"
-                                value={victimDebt}
-                                onChange={(e) => setVictimDebt(e.target.value.replace(/[^0-9]/g, ''))}
-                                placeholder="Enter victim's debt amount..."
-                                disabled={state.actionLoading}
-                            />
-                        </div>
-
-                        {/* Liquidation Preview */}
-                        {parseBigInt(victimCollateral) > 0n && parseBigInt(victimDebt) > 0n && (
-                            <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'var(--bg-glass)', borderRadius: 'var(--radius-md)' }}>
-                                <div className="preview-row">
-                                    <span className="preview-label">Victim's Ratio</span>
-                                    <span className="preview-value" style={{ color: getRatioColor(Number((parseBigInt(victimCollateral) * 100n) / parseBigInt(victimDebt))) }}>
-                                        {Number((parseBigInt(victimCollateral) * 100n) / parseBigInt(victimDebt))}%
-                                    </span>
-                                </div>
-                                <div className="preview-row">
-                                    <span className="preview-label">Liquidatable?</span>
-                                    <span className="preview-value" style={{ color: Number((parseBigInt(victimCollateral) * 100n) / parseBigInt(victimDebt)) < Number(liquidationRatio) ? 'var(--health-green)' : 'var(--health-red)' }}>
-                                        {Number((parseBigInt(victimCollateral) * 100n) / parseBigInt(victimDebt)) < Number(liquidationRatio) ? 'Yes ✓' : 'No ✗'}
-                                    </span>
+            {!selectedAction ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                    {actionCards.map(card => (
+                        <div key={card.key} className="card action-card" onClick={() => setSelectedAction(card.key)} style={{ cursor: 'pointer' }}>
+                            <div className="action-header">
+                                <span className="action-icon">{card.icon}</span>
+                                <h3 style={{ fontSize: '18px' }}>{card.label}</h3>
+                                <div style={{ marginLeft: 'auto' }}>
+                                    <Tooltip label="" content={card.tooltip} />
                                 </div>
                             </div>
-                        )}
-                    </>
-                )}
+                            <p className="action-desc">{card.desc}</p>
+                            <button className="btn btn-ghost" style={{ marginTop: 'auto', alignSelf: 'flex-start' }}>
+                                Start Action →
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="card animate-fade-in" style={{ maxWidth: '600px', margin: '0 auto' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '32px' }}>
+                        <button className="btn btn-ghost" onClick={() => setSelectedAction(null)} style={{ padding: '8px' }}>
+                            ← Back
+                        </button>
+                        <h2 style={{ fontSize: '24px' }}>
+                            {actionCards.find(c => c.key === selectedAction)?.icon}{' '}
+                            {actionCards.find(c => c.key === selectedAction)?.label}
+                        </h2>
+                    </div>
 
-                <button
-                    id={`btn-${tab}`}
-                    className={`btn ${tab === 'liquidate' ? 'btn-danger' : 'btn-primary'} btn-full`}
-                    onClick={handleSubmit}
-                    disabled={state.actionLoading || !canSubmit}
-                >
-                    {state.actionLoading ? (
+                    {state.actionError && <div className="status-red" style={{ padding: '12px', borderRadius: '10px', marginBottom: '20px' }}>⚠ {state.actionError}</div>}
+                    {state.lastTxHash && <div className="status-green" style={{ padding: '12px', borderRadius: '10px', marginBottom: '20px' }}>✅ Success! TX: {state.lastTxHash.slice(0, 10)}...</div>}
+
+                    {selectedAction !== 'liquidate' ? (
                         <>
-                            <span className="spinner" />
-                            Generating ZK proof & submitting...
+                            <div className="form-group">
+                                <label className="form-label">
+                                    {selectedAction === 'deposit' ? 'tNight to Lock' :
+                                        selectedAction === 'withdraw' ? 'tNight to Reclaim' :
+                                            selectedAction === 'mint' ? 'pUSD to Mint' : 'pUSD to Repay'}
+                                </label>
+                                <input
+                                    className="form-input"
+                                    type="text"
+                                    value={amount}
+                                    onChange={(e) => setAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                                    placeholder="0"
+                                    autoFocus
+                                />
+                                {selectedAction === 'repay' && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>Max: {debt.toLocaleString()} pUSD</div>}
+                                {selectedAction === 'withdraw' && <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-muted)' }}>Max: {collateral.toLocaleString()} tN</div>}
+                            </div>
+
+                            {previewRatio && (
+                                <div className="glass-panel" style={{ marginBottom: '24px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>Projected Health</span>
+                                        <span style={{ fontWeight: 'bold', color: previewRatio.safe ? 'var(--status-success)' : 'var(--status-error)' }}>
+                                            {previewRatio.ratio === Infinity ? '∞' : `${previewRatio.ratio.toFixed(1)}%`}
+                                        </span>
+                                    </div>
+                                    <RiskBar ratio={previewRatio.ratio} />
+                                    {!previewRatio.safe && <p style={{ fontSize: '12px', color: 'var(--status-error)', marginTop: '8px' }}>⚠ This action would lead to immediate liquidation risk.</p>}
+                                </div>
+                            )}
                         </>
                     ) : (
-                        <>
-                            {tabs.find(t => t.key === tab)?.icon}{' '}
-                            {tab === 'deposit' ? 'Deposit Collateral' :
-                                tab === 'mint' ? 'Mint pUSD' :
-                                    tab === 'repay' ? 'Repay pUSD' :
-                                        tab === 'withdraw' ? 'Withdraw Collateral' :
-                                            'Liquidate Position'}
-                        </>
+                        <div style={{ display: 'grid', gap: '20px' }}>
+                            <div className="form-group">
+                                <label className="form-label">Victim's Collateral (tNight)</label>
+                                <input className="form-input" type="text" value={victimCollateral} onChange={(e) => setVictimCollateral(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Victim's Debt (pUSD)</label>
+                                <input className="form-input" type="text" value={victimDebt} onChange={(e) => setVictimDebt(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" />
+                            </div>
+                        </div>
                     )}
-                </button>
 
-                {state.actionLoading && (
-                    <div className="alert alert-info" style={{ marginTop: '0.75rem' }}>
-                        ⏳ Your browser is generating a zero-knowledge proof. This can take 30–120 seconds depending on the circuit.
-                    </div>
-                )}
-            </div>
+                    <button
+                        className="btn btn-primary"
+                        style={{ width: '100%', marginTop: '20px' }}
+                        onClick={handleSubmit}
+                        disabled={state.actionLoading || (selectedAction === 'liquidate' ? !victimCollateral : !amount)}
+                    >
+                        {state.actionLoading ? <div className="loading-orbit" style={{ width: '20px', height: '20px' }} /> : 'Confirm Transaction'}
+                    </button>
+
+                    {state.actionLoading && (
+                        <p style={{ marginTop: '16px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                            Generating ZK proof... Please do not close your browser.
+                        </p>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
@@ -301,10 +222,4 @@ function parseBigInt(s: string): bigint {
     } catch {
         return 0n;
     }
-}
-
-function getRatioColor(ratio: number): string {
-    if (ratio >= 170) return 'var(--health-green)';
-    if (ratio >= 150) return 'var(--health-yellow)';
-    return 'var(--health-red)';
 }
