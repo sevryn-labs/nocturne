@@ -6,8 +6,15 @@
   "type": "module",
   "workspaces": [
     "lending-cli",
+    "lending-api",
+    "lending-ui",
     "contract"
   ],
+  "scripts": {
+    "dev:api": "cd lending-api && npm run dev",
+    "dev:ui": "cd lending-ui && npm run dev",
+    "dev:cli": "cd lending-cli && npm run standalone"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@types/node": "^25.3.0",
