@@ -1,18 +1,26 @@
 # pUSD Lending Protocol
 
-[![Generic badge](https://img.shields.io/badge/Compact%20Toolchain-0.28.0-1abc9c.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/TypeScript-5.8.3-blue.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Tests-30%20passing-brightgreen.svg)](https://shields.io/)
+[![Generic badge](https://img.shields.io/badge/Compact%20Toolchain-0.28.0-1abc9c.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/midnight--js-3.0.0-blueviolet.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/wallet--sdk--facade-1.0.0-blue.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Tests-30%20passing-brightgreen.svg)](https://shields.io/)
 
 A **privacy-preserving collateralised lending protocol** built on the [Midnight Network](https://midnight.network). Deposit tNight as collateral, mint pUSD synthetic stablecoins, and maintain positions privately via zero-knowledge proofs — individual debt and collateral amounts are never exposed on-chain.
 
 > Conceptually equivalent to MakerDAO, built for Midnight's ZK-first architecture.
 
-Supports three network targets:
+---
 
-| Network | Description | Command |
-|---------|-------------|---------|
-| **Preprod** | Public testnet — recommended for first run | `npm run preprod-ps` |
-| **Preview** | Public preview testnet | `npm run preview-ps` |
-| **Standalone** | Fully local (node + indexer + proof server via Docker) | `npm run standalone` |
+## Table of Contents
+
+- [How It Works](#how-it-works)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Prerequisites](#prerequisites)
+- [Quick Start](#quick-start)
+- [Using the CLI](#using-the-lending-protocol-cli)
+- [Running Tests](#running-tests)
+- [Standalone Mode](#standalone-mode-fully-local)
+- [Network Targets](#network-targets)
+- [Troubleshooting](#troubleshooting)
+- [Further Reading](#further-reading)
 
 ---
 
@@ -26,25 +34,71 @@ Deposit tNight → Mint pUSD (up to 66% of collateral value)
      Repay pUSD → Withdraw tNight
 ```
 
-**Economic rules** enforced entirely in the Compact ZK circuit:
+### Economic Rules
+
+All rules are enforced entirely inside the Compact ZK circuit — no off-chain trust required:
 
 | Rule | Constraint |
 |------|-----------|
 | Minimum collateral ratio | `collateral × 100 ≥ debt × 150` |
-| Mint cap | `new_debt × 150 ≤ collateral × 100` |
+| Mint cap | `(existingDebt + mintAmount) × 150 ≤ collateral × 100` |
 | Withdraw floor | remaining collateral must still satisfy ratio |
 | Liquidation guard | position must have ratio `< 150%` to be seized |
 
-**What is public vs private:**
+> **Arithmetic note:** Division is not supported in Compact 0.20.x, so all ratio checks are reformulated as multiplications (mathematically equivalent).
+
+### Privacy Model
 
 | Data | Visibility | Reason |
 |------|-----------|--------|
 | `totalCollateral` | 🌐 Public | Protocol solvency audit |
 | `totalDebt` | 🌐 Public | Verify no unbacked pUSD |
-| `liquidationRatio` | 🌐 Public | Transparent risk parameter |
-| **Your collateral** | 🔒 Private | Hidden in ZK — not on-chain |
-| **Your debt** | 🔒 Private | Hidden in ZK — not on-chain |
+| `liquidationRatio` / `mintingRatio` | 🌐 Public | Transparent risk parameter |
+| **Your collateral** | 🔒 Private | Hidden in ZK — never on-chain |
+| **Your debt** | 🔒 Private | Hidden in ZK — never on-chain |
 | **Your identity** | 🔒 Private | Pseudonymous (Midnight public key only) |
+
+Private state lives in a user-controlled local LevelDB database and is supplied to ZK circuits via **witness** functions. The Compact runtime generates a zero-knowledge proof that constraints hold without revealing actual values.
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         CLI (cli.ts)                             │
+│  Menu-driven terminal: wallet setup → contract → lending ops    │
+└──────────────────────────────┬──────────────────────────────────┘
+                               │
+┌──────────────────────────────▼──────────────────────────────────┐
+│                      TypeScript API (api.ts)                     │
+│  Wallet construction · Provider setup · All 5 lending ops        │
+│  Private state management (LevelDB read/write)                   │
+└────┬──────────────┬──────────────┬──────────────┬───────────────┘
+     │              │              │              │
+┌────▼────┐  ┌──────▼─────┐  ┌────▼────┐  ┌─────▼──────┐
+│ Wallet  │  │  midnight-  │  │  Proof  │  │  Indexer   │
+│ Facade  │  │ js-contracts│  │  Server │  │  (public   │
+│(3 subs) │  │(deploy/call)│  │  (ZK)   │  │   data)    │
+└─────────┘  └──────┬──────┘  └─────────┘  └────────────┘
+                    │
+        ┌───────────▼───────────┐
+        │  Compact ZK Contract  │
+        │   (lending.compact)   │
+        │                       │
+        │  5 circuits:          │
+        │  · depositCollateral  │
+        │  · mintPUSD           │
+        │  · repayPUSD          │
+        │  · withdrawCollateral │
+        │  · liquidate          │
+        └───────────────────────┘
+```
+
+The **wallet** is composed of three sub-wallets orchestrated by `WalletFacade`:
+- **ShieldedWallet** — ZK-shielded transactions (zswap)
+- **UnshieldedWallet** — transparent tNight transactions
+- **DustWallet** — dust fee token management
 
 ---
 
@@ -53,28 +107,39 @@ Deposit tNight → Mint pUSD (up to 66% of collateral value)
 ```
 lending_protocol/
 ├── contract/                              # Compact smart contract
+│   ├── package.json                       # @midnight-ntwrk/lending-contract
 │   ├── src/
 │   │   ├── lending.compact                # ← Core protocol (5 ZK circuits)
-│   │   ├── witnesses.ts                   # Private state witness functions
-│   │   ├── index.ts                       # Package entry point
+│   │   ├── witnesses.ts                   # Private state type + witness functions
+│   │   ├── index.ts                       # Package entry point + Lending namespace
 │   │   └── managed/lending/               # Generated by `npm run compact`
 │   │       ├── contract/index.js          #   TypeScript bindings
-│   │       ├── keys/                      #   ZK proving keys
+│   │       ├── keys/                      #   ZK proving/verifying keys
 │   │       └── zkir/                      #   Circuit IR files
 │   └── src/test/
-│       ├── lending-simulator.ts           # In-memory test harness
-│       └── lending.test.ts                # 30 unit tests
+│       ├── lending-simulator.ts           # In-memory test harness (no network)
+│       └── lending.test.ts                # 30 unit tests (vitest)
 │
-├── counter-cli/                           # CLI & API layer
+├── lending-cli/                           # CLI & API layer
+│   ├── package.json                       # @midnight-ntwrk/lending-cli
+│   ├── .env                               # Indexer container env vars
+│   ├── standalone.yml                     # Docker Compose: full local stack
+│   ├── proof-server.yml                   # Docker Compose: proof server only
 │   └── src/
-│       ├── api.ts                         # TypeScript API (all 5 operations)
-│       ├── cli.ts                         # Interactive terminal CLI
-│       ├── common-types.ts                # Shared TypeScript types
-│       ├── config.ts                      # Network configs
-│       ├── preprod.ts / preview.ts        # Network entry points
-│       └── standalone.ts                  # Local Docker entry point
+│       ├── api.ts                         # TypeScript API (all 5 operations + wallet)
+│       ├── cli.ts                         # Interactive terminal CLI (menus + display)
+│       ├── common-types.ts                # Shared types (providers, positions, circuits)
+│       ├── config.ts                      # Network configs (Standalone/Preview/Preprod)
+│       ├── logger-utils.ts                # Pino logger setup
+│       ├── preprod.ts                     # Entry: npm run preprod
+│       ├── preprod-start-proof-server.ts  # Entry: npm run preprod-ps (auto proof server)
+│       ├── preview.ts                     # Entry: npm run preview
+│       ├── preview-start-proof-server.ts  # Entry: npm run preview-ps (auto proof server)
+│       └── standalone.ts                  # Entry: npm run standalone (full Docker stack)
 │
 ├── PROTOCOL.md                            # Full protocol documentation
+├── MIGRATION_GUIDE.md                     # midnight-js 2.x → 3.0.0 migration guide
+├── package.json                           # Root workspace (npm workspaces)
 └── README.md                              # This file
 ```
 
@@ -82,8 +147,9 @@ lending_protocol/
 
 ## Prerequisites
 
-- [Node.js v22+](https://nodejs.org/) — `node --version` to check
-- [Docker](https://docs.docker.com/get-docker/) with `docker compose` — for the local proof server
+- **[Node.js v20+](https://nodejs.org/)** — `node --version` to check
+  > Node.js v22+ is recommended for full SDK compatibility. On v20, a few wallet SDK methods use [Iterator Helpers](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator) (`.entries().every()`, `Set.union()`, `.keys().toArray()`) that require manual patching — see [Troubleshooting](#troubleshooting).
+- **[Docker](https://docs.docker.com/get-docker/)** with `docker compose` — for the proof server and standalone mode
 
 ### Compact Developer Tools
 
@@ -109,7 +175,7 @@ compact compile --version
 
 ---
 
-## Quick Start (Preprod)
+## Quick Start
 
 ### 1. Install dependencies
 
@@ -140,16 +206,16 @@ Expected output from `npm run compact`:
 
 ### 3. Launch the CLI
 
-**Option A — auto-start proof server (recommended):**
+**Option A — Preprod with auto-start proof server (recommended for first run):**
 
 ```bash
 cd lending-cli
 npm run preprod-ps
 ```
 
-This pulls the proof server Docker image, starts it, then launches the CLI.
+This pulls the proof server Docker image, starts it, then launches the CLI connected to the public Preprod testnet.
 
-**Option B — manual proof server:**
+**Option B — Preprod with manual proof server:**
 
 ```bash
 # Terminal 1 — proof server
@@ -159,17 +225,29 @@ cd lending-cli && docker compose -f proof-server.yml up
 cd lending-cli && npm run preprod
 ```
 
+**Option C — Fully local standalone (no testnet needed):**
+
+```bash
+cd lending-cli
+npm run standalone
+```
+
+Starts a complete local Midnight stack via Docker Compose (node, indexer, proof server) with a pre-funded genesis wallet — no faucet needed.
+
 ---
 
 ## Using the Lending Protocol CLI
 
-### Step 1: Create / restore a wallet
+### Step 1: Create or restore a wallet
 
 ```
-╔═════════════════════════════════════════════════════════════╗
-║    pUSD Privacy-Preserving Lending Protocol                 ║
-║    Built on Midnight Network · Powered by ZK Proofs         ║
-╚═════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════╗
+║                                                                  ║
+║    pUSD Privacy-Preserving Lending Protocol                      ║
+║    ─────────────────────────────────────                         ║
+║    Built on Midnight Network · Powered by ZK Proofs              ║
+║                                                                  ║
+╚══════════════════════════════════════════════════════════════════╝
 
   Wallet Setup
   ────────────────────────────────────────────────────────────
@@ -180,6 +258,7 @@ cd lending-cli && npm run preprod
 
 - Choose **[1]** for a fresh wallet — the CLI prints your seed and unshielded address.
 - Choose **[2]** to restore an existing wallet with its 64-hex seed.
+- In **standalone mode**, the genesis wallet is loaded automatically (no prompt).
 
 > **Always save your seed.** It's the only way to restore your wallet and your private position data.
 
@@ -190,13 +269,15 @@ cd lending-cli && npm run preprod
 3. Paste your address and request tNight.
 4. The CLI detects incoming funds automatically.
 
+> In standalone mode, the genesis wallet is pre-funded — skip this step.
+
 ### Step 3: Wait for DUST
 
 After receiving tNight, the CLI registers your NIGHT UTXOs for DUST generation. DUST is the non-transferable fee resource required for all Midnight transactions.
 
 ```
   ✓ Registering 1 NIGHT UTXO(s) for dust generation
-  ✓ Waiting for dust to generate
+  ✓ Waiting for dust tokens to generate
   ✓ Configuring providers
 ```
 
@@ -213,6 +294,7 @@ After receiving tNight, the CLI registers your NIGHT UTXOs for DUST generation. 
 
 - **[1] Deploy** — creates a new lending protocol on-chain. Save the contract address shown on success.
 - **[2] Join** — enter a contract address to interact with an existing deployment.
+- **[3] Monitor** — live-stream your DUST balance (useful while waiting for generation).
 
 ### Step 5: Lend and borrow
 
@@ -247,12 +329,32 @@ After receiving tNight, the CLI registers your NIGHT UTXOs for DUST generation. 
   Debt (pUSD)         : 2,000
   Collateral Ratio    : 150%
   Health              : ✓ Healthy (ratio ≥ 150%)
-  ──────────────────────────────────────────────────────────────
 ```
+
+**View Protocol State** shows the public on-chain totals:
+
+```
+  Public Protocol State
+  ──────────────────────────────────────────────────────────────
+  Total Collateral (tNight) : 3,000
+  Total pUSD Debt           : 2,000
+  Liquidation Ratio         : 150%
+  Minting Ratio             : 150%
+```
+
+### Collateral Ratio Quick Reference
+
+| Collateral | Max Mintable pUSD | Ratio |
+|-----------|------------------|-------|
+| 1,500 | 1,000 | 150% (minimum) |
+| 3,000 | 2,000 | 150% |
+| 10,000 | 6,666 | 150% |
+
+Formula: `maxDebt = (collateral × 100) / 150`
 
 ---
 
-## Running Tests (no network required)
+## Running Tests
 
 ```bash
 cd contract
@@ -272,18 +374,42 @@ npm test
  Tests  30 passed (30)
 ```
 
-Tests run against an in-memory simulator — no Midnight node, no proof server, no Docker needed.
+Tests run against the `LendingSimulator` — an in-memory harness that wraps the Compact-generated contract. No Midnight node, no proof server, no Docker needed.
 
 ---
 
 ## Standalone Mode (fully local)
 
 ```bash
-cd counter-cli
+cd lending-cli
 npm run standalone
 ```
 
-Starts a complete local Midnight stack via Docker Compose (indexer, node, proof server). Uses a pre-funded genesis wallet — no faucet needed.
+Starts a complete local Midnight stack via Docker Compose:
+
+| Container | Image | Purpose |
+|-----------|-------|---------|
+| `lending-node` | `midnightntwrk/midnight-node:0.20.0` | Local Midnight node |
+| `lending-indexer` | `midnightntwrk/indexer-standalone:3.0.0` | Block indexer + GraphQL API |
+| `lending-proof-server` | `midnightntwrk/proof-server:7.0.0` | ZK proof generation |
+
+Uses the genesis seed (`0...01`) with pre-minted tNight — no faucet needed.
+
+---
+
+## Network Targets
+
+| Network | Description | Command | Proof Server |
+|---------|-------------|---------|-------------|
+| **Standalone** | Fully local (Docker) | `npm run standalone` | Included in Docker stack |
+| **Preview** | Public preview testnet | `npm run preview-ps` | Auto-started via Docker |
+| **Preprod** | Public preprod testnet | `npm run preprod-ps` | Auto-started via Docker |
+
+For manual proof server management, use the `-ps`-less variants (`preview`, `preprod`) and start the proof server separately:
+
+```bash
+cd lending-cli && docker compose -f proof-server.yml up -d
+```
 
 ---
 
@@ -292,20 +418,44 @@ Starts a complete local Midnight stack via Docker Compose (indexer, node, proof 
 | Issue | Solution |
 |-------|----------|
 | `compact: command not found` | Run `source $HOME/.local/bin/env` to add it to your PATH |
-| `connect ECONNREFUSED 127.0.0.1:6300` | Start the proof server: `cd counter-cli && docker compose -f proof-server.yml up` |
+| `connect ECONNREFUSED 127.0.0.1:6300` | Start the proof server: `cd lending-cli && docker compose -f proof-server.yml up` |
+| `imbalances.fallible.entries(...).every is not a function` | **Node.js v20 compatibility issue.** The wallet SDK uses Iterator Helpers (Node 22+). Patch `node_modules/@midnight-ntwrk/wallet-sdk-shielded/dist/v1/TransactionImbalances.js`: wrap `.entries().every()` calls with `Array.from()`. Also patch `Imbalances.js` (`Set.union()` → spread syntax) and `TransactionOps.js` (`.keys().toArray()` → `Array.from()`). Or upgrade to Node.js v22+. |
+| `Insufficient collateral: ratio below minting threshold` | Your collateral ratio would drop below 150% after minting. Deposit more collateral first. Formula: need `collateral ≥ (currentDebt + mintAmount) × 1.5` |
+| `Withdrawal would breach liquidation ratio` | Withdrawing would push your ratio below 150%. Repay some debt first. |
 | Proof server hangs on Mac ARM (Apple Silicon) | Docker Desktop → Settings → General → "Virtual Machine Options" → select **Docker VMM**. Restart Docker. |
-| `Failed to clone intent` during deploy | Wallet SDK signing bug — already worked around in this codebase |
-| DUST balance drops to 0 after failed deploy | Known wallet SDK issue. Restart the CLI to release locked DUST coins |
-| Wallet shows 0 balance after faucet | Wait for sync to complete. Confirm you used the correct **unshielded** address |
+| `Failed to clone intent` during deploy | Wallet SDK signing bug — already worked around in this codebase (see `signTransactionIntents` in `api.ts`) |
+| DUST balance drops to 0 after failed tx | Known wallet SDK 1.0.0 issue. Restart the CLI to release locked DUST coins |
+| Wallet shows 0 balance after faucet | Wait for sync to complete. Confirm you used the correct **unshielded** address (`mn_addr_...`) |
 | `Cannot find module './managed/lending/contract/index.js'` | Contract not compiled yet — run `cd contract && npm run compact` first |
 | Tests fail with "Cannot find module" | Build the contract first: `cd contract && npm run compact && npm run build` |
-| Node.js warnings about experimental features | Normal — these don't affect functionality |
+| Node.js warnings about experimental features | Normal — `--loader ts-node/esm` triggers these; they don't affect functionality |
+
+---
+
+## Key Dependencies
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| `@midnight-ntwrk/compact-runtime` | 0.14.0 | Compact contract runtime |
+| `@midnight-ntwrk/midnight-js-contracts` | 3.0.0 | Contract deploy/call/join |
+| `@midnight-ntwrk/wallet-sdk-facade` | 1.0.0 | Unified wallet interface |
+| `@midnight-ntwrk/wallet-sdk-hd` | 3.0.0 | HD key derivation |
+| `@midnight-ntwrk/ledger-v7` (via `@midnight-ntwrk/ledger`) | ^4.0.0 | Ledger types & primitives |
+| `pino` | ^10.3.1 | Structured logging |
+| `testcontainers` | ^11.12.0 | Docker management for standalone mode |
 
 ---
 
 ## Further Reading
 
 - **[PROTOCOL.md](PROTOCOL.md)** — Complete protocol documentation: economic model, privacy design, circuit descriptions, ratio math, and liquidation mechanics
+- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** — Detailed guide for migrating from midnight-js 2.x to 3.0.0 (wallet SDK, docker images, contract patterns)
 - [Preprod Faucet](https://faucet.preprod.midnight.network) — Get testnet tNight tokens
 - [Midnight Documentation](https://docs.midnight.network/) — Developer guide
 - [Compact Language Reference](https://docs.midnight.network/compact) — Smart contract language
+
+---
+
+## License
+
+Licensed under the [Apache License 2.0](LICENSE).
