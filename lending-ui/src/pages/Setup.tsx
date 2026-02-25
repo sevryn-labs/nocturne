@@ -282,11 +282,11 @@ export const Setup: React.FC = () => {
     };
 
     React.useEffect(() => {
-        if (state.wallet && state.contractAddress && !state.contractLoading && state.health?.ready) {
+        if (state.wallet && state.contractAddress && !state.contractLoading) {
             actions.refreshProtocol();
             actions.refreshPosition();
         }
-    }, [state.wallet, state.contractAddress, state.contractLoading, state.health?.ready]);
+    }, [state.wallet, state.contractAddress, state.contractLoading]);
 
     const hasWallet = !!state.wallet;
     const hasContract = !!state.contractAddress;
