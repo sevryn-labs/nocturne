@@ -1,12 +1,22 @@
-// pUSD Lending Protocol — Midnight Network  (Compact 0.20.x)
+// pUSD Lending Protocol — Midnight Network  (Compact 0.28.0 / midnight-js 3.0.0)
 //
 // DESIGN OVERVIEW
 // ───────────────
-// A privacy-preserving collateralised debt protocol inspired by MakerDAO.
+// A privacy-preserving collateralised debt protocol with a fully transferable
+// pUSD fungible token, inspired by MakerDAO and using the OpenZeppelin
+// FungibleToken pattern for Compact.
 //
 //   • Collateral asset: tNight (Midnight testnet token)
-//   • Synthetic asset : pUSD  (protocol-internal accounting token)
+//   • Synthetic asset : pUSD  (ERC-20-style fungible token, minted/burned by this contract)
 //   • Min. ratio      : 150% (e.g. 150 tNight → max 100 pUSD)
+//
+// TOKEN MODEL
+// ───────────
+// pUSD is a fully transferable fungible token implemented directly within this
+// contract, following the OpenZeppelin FungibleToken.compact pattern.
+// The lending protocol is the SOLE authority for minting and burning:
+//
+//   INVARIANT: totalSupply == totalDebt (enforced on every mint and burn)
 //
 // PUBLIC vs PRIVATE STATE
 // ───────────────────────
@@ -15,6 +25,14 @@
 //   totalDebt        — aggregate pUSD issued; proves no unbacked minting  (Counter)
 //   liquidationRatio — liquidation threshold, 150 = 150%                 (Counter)
 //   mintingRatio     — same as liquidationRatio in this MVP              (Counter)
+//
+//   TOKEN LEDGERS (OpenZeppelin FungibleToken pattern):
+//   _balances        — pUSD balance per ZswapCoinPublicKey               (Map)
+//   _allowances      — approved spend amounts (owner → spender → amount) (Map)
+//   _totalSupply     — current pUSD total supply (= totalDebt always)    (Uint<128>)
+//   _decimals        — 18                                                (Uint<8>)
+//   name/symbol      — "pUSD" (constant, stored off-chain; Compact 0.20 cannot
+//                       initialise Opaque<"string"> from string literals)
 //
 // PRIVATE (proven in ZK, never on-chain):
 //   collateralAmount — individual depositer's tNight balance             (witness)
@@ -27,24 +45,29 @@
 // generates a proof that circuit constraints hold WITHOUT revealing the
 // actual collateral/debt to verifiers or other users.
 //
-// ARITHMETIC DESIGN NOTE (Compact 0.20.x)
-// ─────────────────────────────────────────
-// Division is not supported in Compact 0.20.x circuits.  All ratio checks
-// are reformulated as multiplications:
+// pUSD token BALANCES, however, are public ledger state (as in any ERC-20).
+// Only individual debt positions remain private.
+//
+// ARITHMETIC DESIGN NOTE
+// ──────────────────────
+// Division is not supported in Compact circuits.  All ratio checks are
+// reformulated as multiplications:
 //
 //   (collateral * 100) / debt >= 150
 //     ↔  collateral * 100 >= debt * 150    (multiply both sides by debt > 0)
 //
-// This is mathematically equivalent and avoids division entirely.
+// TOKEN SUPPLY INVARIANT
+// ──────────────────────
+// Supply equals debt at all times:
+//   • mintPUSD    → _mint(borrower, amount)  + totalDebt.increment(amount)
+//   • repayPUSD   → _burn(borrower, amount)  + totalDebt.decrement(amount)
+//   • liquidate   → _burn(liquidator,amount) + totalDebt.decrement(victimDebt)
 //
-// DISCLOSURE DESIGN
-// ─────────────────
-// Compact 0.20.x requires every value flowing through a witness that
-// subsequently feeds into a ledger operation to be wrapped in `disclose()`.
-// This explicitly marks the value as acceptable-to-reveal (the amount
-// deposited or repaid is already public from the transaction itself).
-// Private values (collateral/debt balances) are used only in `assert()`
-// statements which do NOT require disclosure.
+// LIQUIDATOR TOKEN REQUIREMENT
+// ───────────────────────────
+// The liquidator must hold the victim's pUSD debt amount in their token
+// balance to call liquidate(). The circuit burns those tokens, ensuring
+// no new pUSD is created during liquidation.
 
 pragma language_version >= 0.20;
 
@@ -58,6 +81,7 @@ export ledger totalCollateral: Counter;
 
 // Total pUSD issued (all users combined).
 // Public: proves no unbacked synthetic tokens were minted.
+// INVARIANT: totalDebt == _totalSupply always
 export ledger totalDebt: Counter;
 
 // Minimum collateral-to-debt ratio in percent. 150 = 150%.
@@ -66,6 +90,31 @@ export ledger liquidationRatio: Counter;
 
 // Ratio enforced on new minting (same as liquidationRatio in this MVP).
 export ledger mintingRatio: Counter;
+
+// ─── pUSD Token Ledger State (OpenZeppelin FungibleToken pattern) ─────────────
+//
+// These implement ERC-20-equivalent semantics for pUSD on Midnight.
+// Balances are keyed by ZswapCoinPublicKey (the user's shielded public key).
+
+// Per-account pUSD balances
+export ledger _balances: Map<ZswapCoinPublicKey, Uint<128>>;
+
+// Approved allowances stored as a flat map with composite (owner, spender) key.
+// Compact does not support nested Map types as local variables in circuits.
+struct AllowanceKey {
+  owner: ZswapCoinPublicKey,
+  spender: ZswapCoinPublicKey,
+}
+export ledger _allowances: Map<AllowanceKey, Uint<128>>;
+
+// Total pUSD in circulation. Always equals totalDebt.
+export ledger _totalSupply: Uint<128>;
+
+// Token metadata
+// NOTE: name and symbol are fixed as "pUSD" — stored off-chain in API/UI.
+// Compact 0.20 does not support Opaque<"string"> initialization from string literals.
+// _decimals is stored on-chain as it's a numeric constant.
+export ledger _decimals: Uint<8>;
 
 // ─── Private Witness Declarations ────────────────────────────────────────────
 //
@@ -81,6 +130,155 @@ witness debtAmount(): Uint<64>;         // caller's outstanding pUSD debt
 constructor() {
   liquidationRatio.increment(150 as Uint<16>);
   mintingRatio.increment(150 as Uint<16>);
+  _decimals = disclose(18 as Uint<8>);
+  _totalSupply = disclose(0 as Uint<128>);
+}
+
+// ─── Internal Token Helpers ───────────────────────────────────────────────────
+//
+// These circuits implement the core ERC-20 balance mechanics.
+// They are internal (not exported) — only called from the lending circuits.
+
+// Returns pUSD balance for `account` (0 if never held).
+circuit _balanceOf(account: ZswapCoinPublicKey): Uint<128> {
+  if (!_balances.member(disclose(account))) {
+    return 0 as Uint<128>;
+  }
+  return _balances.lookup(disclose(account));
+}
+
+// Returns allowance of `spender` on behalf of `owner` (0 if not set).
+circuit _allowanceOf(
+  owner: ZswapCoinPublicKey,
+  spender: ZswapCoinPublicKey
+): Uint<128> {
+  const key: AllowanceKey = AllowanceKey { owner: owner, spender: spender };
+  if (!_allowances.member(disclose(key))) {
+    return 0 as Uint<128>;
+  }
+  return _allowances.lookup(disclose(key));
+}
+
+// Internal: mint `value` pUSD to `account`.
+// Increments _totalSupply and _balances[account].
+circuit _mint(account: ZswapCoinPublicKey, value: Uint<128>): [] {
+  assert(value > 0, "pUSD: mint amount must be positive");
+
+  _totalSupply = disclose((_totalSupply + value) as Uint<128>);
+
+  const currentBal = _balanceOf(account);
+  _balances.insert(disclose(account), disclose((currentBal + value) as Uint<128>));
+}
+
+// Internal: burn `value` pUSD from `account`.
+// Decrements _totalSupply and _balances[account].
+circuit _burn(account: ZswapCoinPublicKey, value: Uint<128>): [] {
+  assert(value > 0, "pUSD: burn amount must be positive");
+
+  const accountBal = _balanceOf(account);
+  assert(accountBal >= value, "pUSD: burn amount exceeds balance");
+
+  _balances.insert(disclose(account), disclose((accountBal - value) as Uint<128>));
+  _totalSupply = disclose((_totalSupply - value) as Uint<128>);
+}
+
+// Internal: set allowance (owner approves spender for value).
+circuit _approve(
+  owner: ZswapCoinPublicKey,
+  spender: ZswapCoinPublicKey,
+  value: Uint<128>
+): [] {
+  const key: AllowanceKey = AllowanceKey { owner: owner, spender: spender };
+  _allowances.insert(disclose(key), disclose(value));
+}
+
+// Internal: deduct from spender's allowance.
+// If allowance is set to MAX_UINT128 it is treated as infinite (not decremented).
+circuit _spendAllowance(
+  owner: ZswapCoinPublicKey,
+  spender: ZswapCoinPublicKey,
+  value: Uint<128>
+): [] {
+  const currentAllowance = _allowanceOf(owner, spender);
+  const MAX_UINT128: Uint<128> = 340282366920938463463374607431768211455 as Uint<128>;
+  assert(currentAllowance == MAX_UINT128 || currentAllowance >= value, "pUSD: insufficient allowance");
+  // Only reduce allowance when it is not the infinite sentinel
+  if (currentAllowance < MAX_UINT128) {
+    _approve(owner, spender, (currentAllowance - value) as Uint<128>);
+  }
+}
+
+// ─── Token Public Circuits ────────────────────────────────────────────────────
+//
+// Standard ERC-20-style interface. Users can call these freely to transfer
+// pUSD. There is NO restriction on who can transfer what they own.
+
+// Return decimals precision (18).
+export circuit decimals(): Uint<8> {
+  return _decimals;
+}
+
+// Return total pUSD supply (always equals totalDebt).
+export circuit totalSupply(): Uint<128> {
+  return _totalSupply;
+}
+
+// Return pUSD balance of `account`.
+export circuit balanceOf(account: ZswapCoinPublicKey): Uint<128> {
+  return _balanceOf(account);
+}
+
+// Return the allowance `spender` has from `owner`.
+export circuit allowance(
+  owner: ZswapCoinPublicKey,
+  spender: ZswapCoinPublicKey
+): Uint<128> {
+  return _allowanceOf(owner, spender);
+}
+
+// Transfer `value` pUSD from caller to `to`.
+// Caller must have sufficient balance.
+export circuit transfer(to: ZswapCoinPublicKey, value: Uint<128>): Boolean {
+  assert(value > 0, "pUSD: transfer amount must be positive");
+
+  const sender = ownPublicKey();
+  const senderBal = _balanceOf(sender);
+  assert(senderBal >= value, "pUSD: insufficient balance");
+
+  _balances.insert(disclose(sender), disclose((senderBal - value) as Uint<128>));
+
+  const toBal = _balanceOf(to);
+  _balances.insert(disclose(to), disclose((toBal + value) as Uint<128>));
+
+  return true;
+}
+
+// Approve `spender` to spend `value` pUSD on caller's behalf.
+export circuit approve(spender: ZswapCoinPublicKey, value: Uint<128>): Boolean {
+  const owner = ownPublicKey();
+  _approve(owner, spender, value);
+  return true;
+}
+
+// Transfer `value` pUSD from `tokenOwner` to `to`, spending caller's allowance.
+export circuit transferFrom(
+  tokenOwner: ZswapCoinPublicKey,
+  to: ZswapCoinPublicKey,
+  value: Uint<128>
+): Boolean {
+  assert(value > 0, "pUSD: transfer amount must be positive");
+
+  const spender = ownPublicKey();
+  _spendAllowance(disclose(tokenOwner), disclose(spender), value);
+
+  const ownerBal = _balanceOf(tokenOwner);
+  assert(ownerBal >= value, "pUSD: insufficient balance");
+  _balances.insert(disclose(tokenOwner), disclose((ownerBal - value) as Uint<128>));
+
+  const toBal = _balanceOf(to);
+  _balances.insert(disclose(to), disclose((toBal + value) as Uint<128>));
+
+  return true;
 }
 
 // ─── Circuit: depositCollateral ──────────────────────────────────────────────
@@ -111,9 +309,15 @@ export circuit depositCollateral(amount: Uint<64>): [] {
 // Mints `amount` pUSD against the caller's existing collateral.
 // Enforces: collateral * 100 >= (existingDebt + amount) * mintingRatio
 //
-// Public effect  : totalDebt += amount
+// After the collateral check:
+//   1. totalDebt is incremented (public aggregate)
+//   2. _mint(borrower, amount) is called (transfers newly-minted pUSD to caller)
+//
+// INVARIANT: _totalSupply == totalDebt after this call
+//
+// Public effects : totalDebt += amount, _totalSupply += amount, _balances[caller] += amount
 // Private effect : debtAmount += amount  (updated in api.ts)
-// ZK proven      : the post-mint ratio is still ≥ 150%
+// ZK proven      : the post-mint ratio is still >= 150%
 
 export circuit mintPUSD(amount: Uint<64>): [] {
   assert(amount > 0, "Mint amount must be positive");
@@ -127,15 +331,27 @@ export circuit mintPUSD(amount: Uint<64>): [] {
   const ratio: Uint<64> = mintingRatio as Uint<64>;
   assert(myCollateral * 100 >= newDebt * ratio, "Insufficient collateral: ratio below minting threshold");
 
+  // Increment public aggregate debt
   totalDebt.increment(disclose(amount) as Uint<16>);
+
+  // Mint pUSD tokens to calling user
+  // ownPublicKey() returns the ZswapCoinPublicKey of the caller
+  _mint(ownPublicKey(), disclose(amount) as Uint<128>);
 }
 
 // ─── Circuit: repayPUSD ──────────────────────────────────────────────────────
 //
-// Burns `amount` pUSD — reduces the caller's private debt.
-// In a token-enabled variant, this would also require pUSD to be sent in.
+// Burns `amount` pUSD from the caller's token balance — reduces debt.
 //
-// Public effect  : totalDebt -= amount
+// Flow:
+//   1. Verify the caller has >= amount pUSD tokens (on-chain balance check)
+//   2. Verify private debt >= amount (ZK proof)
+//   3. _burn(caller, amount)       — destroys pUSD tokens (decrements _totalSupply)
+//   4. totalDebt.decrement(amount) — reduces public aggregate debt
+//
+// INVARIANT: _totalSupply == totalDebt after this call
+//
+// Public effects : totalDebt -= amount, _totalSupply -= amount, _balances[caller] -= amount
 // Private effect : debtAmount -= amount  (updated in api.ts)
 // ZK proven      : myDebt >= amount (cannot repay more than owed)
 
@@ -145,6 +361,11 @@ export circuit repayPUSD(amount: Uint<64>): [] {
   const myDebt = debtAmount();
   assert(myDebt >= amount, "Cannot repay more than outstanding debt");
 
+  // Burn pUSD tokens from caller's balance
+  // The _burn circuit also checks caller has sufficient token balance
+  _burn(ownPublicKey(), disclose(amount) as Uint<128>);
+
+  // Decrement public aggregate debt
   totalDebt.decrement(disclose(amount) as Uint<16>);
 }
 
@@ -182,18 +403,26 @@ export circuit withdrawCollateral(amount: Uint<64>): [] {
 
 // ─── Circuit: liquidate ──────────────────────────────────────────────────────
 //
-// Liquidates an undercollateralised position.  The protocol-level liquidator
-// (keeper bot or vigilant user) calls this with the victim's position values.
-// The circuit verifies the position is genuinely undercollateralised.
+// Liquidates an undercollateralised position.
 //
-// Public effect  : totalCollateral -= victimCollateral
+// The LIQUIDATOR must hold victimDebt pUSD in their token balance to call this.
+// Those tokens are burned, reducing total supply and total debt.
+// The victim's collateral is seized (removed from totalCollateral).
+//
+// Flow:
+//   1. Verify the position is undercollateralised (victimCollateral * 100 < victimDebt * 150)
+//   2. _burn(liquidator, victimDebt) — burns victim's debt worth of pUSD from liquidator
+//   3. totalDebt.decrement(victimDebt)
+//   4. totalCollateral.decrement(victimCollateral)
+//
+// INVARIANT: _totalSupply == totalDebt after this call
+//
+// Public effects : totalCollateral -= victimCollateral
 //                  totalDebt        -= victimDebt
-// Private effect : none (the victim's private balances are now stale client-side)
-// ZK proven      : victimCollateral * 100 < victimDebt * 150
-//
-// Privacy note: the victim's exact amounts ARE revealed here to the liquidator,
-// as a necessary trade-off to prove the position is unhealthy.  The victim's
-// Midnight public key (identity) remains pseudonymous.
+//                  _totalSupply     -= victimDebt
+//                  _balances[liquidator] -= victimDebt
+// Privacy note   : the victim's exact amounts ARE revealed here to the liquidator,
+//                  as a necessary trade-off to prove the position is unhealthy.
 
 export circuit liquidate(victimCollateral: Uint<64>, victimDebt: Uint<64>): [] {
   assert(victimDebt       > 0, "Cannot liquidate a position with no debt");
@@ -204,6 +433,13 @@ export circuit liquidate(victimCollateral: Uint<64>, victimDebt: Uint<64>): [] {
   // Undercollateralised iff: victimCollateral * 100 < victimDebt * 150
   assert(victimCollateral * 100 < victimDebt * ratio, "Position is not undercollateralised");
 
-  totalCollateral.decrement(disclose(victimCollateral) as Uint<16>);
+  // Burn victimDebt pUSD from the liquidator's balance
+  // (the liquidator must hold this amount to call this circuit)
+  _burn(ownPublicKey(), disclose(victimDebt) as Uint<128>);
+
+  // Reduce public aggregate debt
   totalDebt.decrement(disclose(victimDebt) as Uint<16>);
+
+  // Seize victim's collateral
+  totalCollateral.decrement(disclose(victimCollateral) as Uint<16>);
 }

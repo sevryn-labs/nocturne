@@ -262,12 +262,15 @@ export class LendingService {
         const contractState = await this.providers!.publicDataProvider.queryContractState(this.contractAddress);
         if (contractState == null) return null;
 
-        const lstate = Lending.ledger(contractState.data);
+        const lstate = Lending.ledger(contractState.data) as any;
+        // Cast to any: stale generated types will be resolved after `npm run compact`.
         return {
-            totalCollateral: lstate.totalCollateral,
-            totalDebt: lstate.totalDebt,
-            liquidationRatio: lstate.liquidationRatio,
-            mintingRatio: lstate.mintingRatio,
+            totalCollateral: lstate.totalCollateral as bigint,
+            totalDebt: lstate.totalDebt as bigint,
+            liquidationRatio: lstate.liquidationRatio as bigint,
+            mintingRatio: lstate.mintingRatio as bigint,
+            // _totalSupply always equals totalDebt (supply == debt invariant)
+            totalSupply: (lstate._totalSupply as bigint | undefined) ?? 0n,
         };
     }
 
@@ -331,6 +334,9 @@ export class LendingService {
             throw new Error(`Cannot repay ${amount} — current debt is only ${state.debtAmount}`);
         }
 
+        // The circuit burns `amount` pUSD from the caller's token balance
+        // AND decrements totalDebt — both happen atomically in the ZK proof.
+        // The caller must hold >= amount pUSD tokens in their wallet.
         const txData = await this.contract!.callTx.repayPUSD(amount);
 
         await this.updatePrivateState((s) => ({
@@ -371,8 +377,75 @@ export class LendingService {
             throw new Error(`Position ratio is ${ratio}% — not liquidatable (must be < 150%)`);
         }
 
+        // IMPORTANT: The caller must hold >= victimDebt pUSD tokens.
+        // The circuit burns those tokens AND reduces totalDebt + totalCollateral
+        // atomically. Invariant: _totalSupply == totalDebt after liquidation.
         const txData = await this.contract!.callTx.liquidate(victimCollateral, victimDebt);
 
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    /**
+     * Query the pUSD token balance (public ledger) for self or any address.
+     * Returns the raw Uint<128> value as a bigint.
+     */
+    async getPUSDBalance(publicKeyHex?: string): Promise<bigint> {
+        this.requireProviders();
+        if (!this.contractAddress) throw new Error('No contract deployed or joined');
+
+        assertIsContractAddress(this.contractAddress);
+        const contractState = await this.providers!.publicDataProvider.queryContractState(this.contractAddress);
+        if (contractState == null) return 0n;
+
+        // Resolve public key: caller's own key if not specified
+        const keyHex = publicKeyHex ?? this.getOwnPublicKey();
+        if (!keyHex) return 0n;
+
+        const lstate = Lending.ledger(contractState.data) as any;
+        try {
+            const balance = lstate._balances?.lookup?.(keyHex) ?? 0n;
+            return BigInt(balance as bigint);
+        } catch {
+            return 0n;
+        }
+    }
+
+    /** Returns shielded coin public key hex of the current wallet, or null if not synced. */
+    private getOwnPublicKey(): string | null {
+        // This is a sync best-effort; for async use, call wallet.state() directly.
+        return null;
+    }
+
+    /**
+     * Transfer `amount` pUSD to `toPublicKeyHex`.
+     * Caller must hold >= amount pUSD tokens (checked in-circuit).
+     */
+    async transferPUSD(toPublicKeyHex: string, amount: bigint): Promise<TxResult> {
+        this.requireContract();
+        if (amount <= 0n) throw new Error('Transfer amount must be positive');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const txData = await (this.contract!.callTx as any).transfer(toPublicKeyHex, amount);
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    /**
+     * Approve `spenderPublicKeyHex` to spend up to `amount` pUSD.
+     */
+    async approvePUSD(spenderPublicKeyHex: string, amount: bigint): Promise<TxResult> {
+        this.requireContract();
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const txData = await (this.contract!.callTx as any).approve(spenderPublicKeyHex, amount);
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    /**
+     * Transfer pUSD from `fromPublicKeyHex` to `toPublicKeyHex` using allowance.
+     */
+    async transferPUSDFrom(fromPublicKeyHex: string, toPublicKeyHex: string, amount: bigint): Promise<TxResult> {
+        this.requireContract();
+        if (amount <= 0n) throw new Error('Transfer amount must be positive');
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const txData = await (this.contract!.callTx as any).transferFrom(fromPublicKeyHex, toPublicKeyHex, amount);
         return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 

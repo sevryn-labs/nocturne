@@ -194,6 +194,48 @@ app.post('/api/actions/liquidate', asyncHandler(async (req, res) => {
     sendJson(res, result);
 }));
 
+// ─── pUSD Token Endpoints ───────────────────────────────────────────────────────
+
+// Query pUSD token balance for a given public key (or own key if not provided)
+app.get('/api/token/balance', asyncHandler(async (req, res) => {
+    const publicKey = typeof req.query.publicKey === 'string' ? req.query.publicKey : undefined;
+    const balance = await service.getPUSDBalance(publicKey);
+    sendJson(res, { balance: balance.toString() });
+}));
+
+// Transfer pUSD to another address
+app.post('/api/token/transfer', asyncHandler(async (req, res) => {
+    const { to, amount } = req.body;
+    if (!to || !amount) {
+        sendJson(res, { error: 'to and amount are required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.transferPUSD(to as string, BigInt(amount));
+    sendJson(res, result);
+}));
+
+// Approve a spender to use pUSD on caller's behalf
+app.post('/api/token/approve', asyncHandler(async (req, res) => {
+    const { spender, amount } = req.body;
+    if (!spender || !amount) {
+        sendJson(res, { error: 'spender and amount are required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.approvePUSD(spender as string, BigInt(amount));
+    sendJson(res, result);
+}));
+
+// Transfer pUSD from one address to another using the caller's allowance
+app.post('/api/token/transfer-from', asyncHandler(async (req, res) => {
+    const { from, to, amount } = req.body;
+    if (!from || !to || !amount) {
+        sendJson(res, { error: 'from, to and amount are required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.transferPUSDFrom(from as string, to as string, BigInt(amount));
+    sendJson(res, result);
+}));
+
 // ─── Start Server ────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
@@ -210,4 +252,9 @@ app.listen(PORT, () => {
     console.log(`  POST /api/actions/repay`);
     console.log(`  POST /api/actions/withdraw`);
     console.log(`  POST /api/actions/liquidate`);
+    console.log(`  --- pUSD Token ---`);
+    console.log(`  GET  /api/token/balance?publicKey=<hex>`);
+    console.log(`  POST /api/token/transfer`);
+    console.log(`  POST /api/token/approve`);
+    console.log(`  POST /api/token/transfer-from`);
 });

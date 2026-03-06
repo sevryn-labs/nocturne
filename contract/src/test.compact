@@ -1,0 +1,9 @@
+pragma language_version >= 0.20;
+
+import CompactStandardLibrary;
+
+export ledger pUSD: Currency;
+
+export circuit mint_test(a: Uint<64>): [] {
+    pUSD.mint(a);
+}

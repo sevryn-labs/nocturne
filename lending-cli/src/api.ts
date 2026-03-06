@@ -5,7 +5,8 @@
 //   • Wallet construction (HD key derivation → ShieldedWallet + UnshieldedWallet + DustWallet)
 //   • Provider setup (ZK config, proof server, indexer, private state storage)
 //   • Contract deployment and joining
-//   • All five lending operations: deposit, mint, repay, withdraw, liquidate
+//   • All lending operations: deposit, mint, repay, withdraw, liquidate
+//   • pUSD token operations: balance query, transfer, approve, transferFrom
 //   • Private state management (reading/updating the local LevelDB state)
 //
 // The wallet-sdk workaround for the signRecipe / pre-proof bug is carried over
@@ -109,21 +110,53 @@ export const getProtocolState = async (
     return null;
   }
 
-  const lstate = Lending.ledger(contractState.data);
+  const lstate = Lending.ledger(contractState.data) as any;
+  // _totalSupply is the pUSD token total supply — always equals totalDebt
+  // NOTE: lstate is cast to `any` because the managed types are stale until
+  // `npm run compact` is re-run.  After recompile, the type will include
+  // _totalSupply, _balances, _allowances, _name, _symbol, _decimals.
+  const totalSupply: bigint = (lstate._totalSupply as bigint | undefined) ?? 0n;
   const state: ProtocolState = {
-    totalCollateral: lstate.totalCollateral,
-    totalDebt: lstate.totalDebt,
-    liquidationRatio: lstate.liquidationRatio,
-    mintingRatio: lstate.mintingRatio,
+    totalCollateral: lstate.totalCollateral as bigint,
+    totalDebt: lstate.totalDebt as bigint,
+    liquidationRatio: lstate.liquidationRatio as bigint,
+    mintingRatio: lstate.mintingRatio as bigint,
+    totalSupply,
   };
 
   logger.info(
     `Protocol state: totalCollateral=${state.totalCollateral}, ` +
     `totalDebt=${state.totalDebt}, ` +
+    `totalSupply=${state.totalSupply}, ` +
     `liquidationRatio=${state.liquidationRatio}%, ` +
     `mintingRatio=${state.mintingRatio}%`,
   );
   return state;
+};
+
+/**
+ * Query the pUSD token balance for a given ZswapCoinPublicKey (hex string).
+ * pUSD balances are public ledger state — queryable by anyone.
+ */
+export const getPUSDBalance = async (
+  providers: LendingProviders,
+  contractAddress: ContractAddress,
+  publicKeyHex: string,
+): Promise<bigint> => {
+  assertIsContractAddress(contractAddress);
+  const contractState = await providers.publicDataProvider.queryContractState(contractAddress);
+  if (contractState == null) return 0n;
+
+  const lstate = Lending.ledger(contractState.data) as any;
+  // _balances is a Map<ZswapCoinPublicKey, Uint<128>>
+  // We look up by the hex public key string.
+  // Cast to any: types update after `npm run compact`.
+  try {
+    const balance = lstate._balances?.lookup?.(publicKeyHex) ?? 0n;
+    return BigInt(balance as bigint);
+  } catch {
+    return 0n;
+  }
 };
 
 /**
@@ -279,6 +312,12 @@ export const mintPUSD = async (
 
 /**
  * Repay `amount` pUSD, reducing the position's debt.
+ *
+ * The circuit burns `amount` pUSD tokens from the caller's token balance
+ * (public ledger _balances) and decrements totalDebt. The caller must
+ * hold at least `amount` pUSD tokens in their wallet to call this.
+ *
+ * Invariant enforced in-circuit: _totalSupply -= amount, totalDebt -= amount
  */
 export const repayPUSD = async (
   contract: DeployedLendingContract,
@@ -292,8 +331,11 @@ export const repayPUSD = async (
     throw new Error(`Cannot repay ${amount} — current debt is only ${ps.debtAmount}`);
   }
 
-  logger.info(`Repaying ${amount} pUSD...`);
+  logger.info(`Repaying ${amount} pUSD (circuit will burn tokens + reduce totalDebt)...`);
 
+  // The circuit: (1) burns amount pUSD from caller's token balance,
+  //              (2) decrements totalDebt
+  // Both happen atomically on-chain in the ZK proof.
   const txData = await contract.callTx.repayPUSD(amount);
 
   // Update private state: decrement debt
@@ -341,11 +383,19 @@ export const withdrawCollateral = async (
 // ─── liquidate ───────────────────────────────────────────────────────────────
 
 /**
- * Liquidate an undercollateralised position identified by the victim's
- * collateral and debt amounts that the liquidator can prove (e.g. from
- * off-chain observation or keepers).
+ * Liquidate an undercollateralised position.
  *
- * On success the liquidator receives the victim's collateral.
+ * IMPORTANT: The caller (liquidator) must hold at least `victimDebt` pUSD
+ * tokens in their wallet. The circuit burns those tokens to reduce
+ * totalDebt and totalSupply before seizing the collateral.
+ *
+ * Flow (all in a single ZK proof):
+ *   1. Verify victimCollateral * 100 < victimDebt * 150
+ *   2. Burn victimDebt pUSD from the liquidator's token balance
+ *   3. totalDebt    -= victimDebt
+ *   4. totalCollateral -= victimCollateral
+ *
+ * Invariant: _totalSupply == totalDebt after this call.
  */
 export const liquidate = async (
   contract: DeployedLendingContract,
@@ -360,11 +410,70 @@ export const liquidate = async (
     throw new Error(`Position ratio is ${ratio}% — not liquidatable (must be < 150%)`);
   }
 
-  logger.info(`Liquidating position: collateral=${victimCollateral}, debt=${victimDebt}, ratio=${ratio}%`);
+  logger.info(
+    `Liquidating position: collateral=${victimCollateral}, debt=${victimDebt}, ratio=${ratio}%\n` +
+    `  Liquidator must hold ${victimDebt} pUSD tokens — they will be burned in-circuit.`,
+  );
 
+  // The circuit burns victimDebt pUSD from the caller, then seizes collateral
   const txData = await contract.callTx.liquidate(victimCollateral, victimDebt);
 
   logger.info(`liquidate confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+// ─── pUSD Token Transfer Operations ──────────────────────────────────────────
+//
+// Users who hold pUSD can transfer it freely. These call the token circuits
+// (transfer / approve / transferFrom) on the contract directly.
+
+/**
+ * Transfer `amount` pUSD from caller to `toPublicKeyHex`.
+ * The caller must hold >= amount pUSD tokens.
+ */
+export const transferPUSD = async (
+  contract: DeployedLendingContract,
+  toPublicKeyHex: string,
+  amount: bigint,
+): Promise<FinalizedTxData> => {
+  if (amount <= 0n) throw new Error('Transfer amount must be positive');
+  logger.info(`Transferring ${amount} pUSD to ${toPublicKeyHex}...`);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  const txData = await (contract.callTx as any).transfer(toPublicKeyHex, amount);
+  logger.info(`transfer confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+/**
+ * Approve `spenderPublicKeyHex` to spend up to `amount` pUSD on caller's behalf.
+ */
+export const approvePUSD = async (
+  contract: DeployedLendingContract,
+  spenderPublicKeyHex: string,
+  amount: bigint,
+): Promise<FinalizedTxData> => {
+  logger.info(`Approving ${spenderPublicKeyHex} to spend ${amount} pUSD...`);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  const txData = await (contract.callTx as any).approve(spenderPublicKeyHex, amount);
+  logger.info(`approve confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+/**
+ * Transfer `amount` pUSD from `fromPublicKeyHex` to `toPublicKeyHex`,
+ * spending caller's previously approved allowance.
+ */
+export const transferPUSDFrom = async (
+  contract: DeployedLendingContract,
+  fromPublicKeyHex: string,
+  toPublicKeyHex: string,
+  amount: bigint,
+): Promise<FinalizedTxData> => {
+  if (amount <= 0n) throw new Error('Transfer amount must be positive');
+  logger.info(`TransferFrom: ${fromPublicKeyHex} → ${toPublicKeyHex} for ${amount} pUSD...`);
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+  const txData = await (contract.callTx as any).transferFrom(fromPublicKeyHex, toPublicKeyHex, amount);
+  logger.info(`transferFrom confirmed in block ${txData.public.blockHeight}`);
   return txData.public;
 };
 

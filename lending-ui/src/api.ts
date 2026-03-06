@@ -69,6 +69,8 @@ export interface ProtocolState {
     totalDebt: string;
     liquidationRatio: string;
     mintingRatio: string;
+    /** pUSD token total supply — always equals totalDebt */
+    totalSupply: string;
 }
 
 export interface UserPosition {
@@ -154,6 +156,28 @@ export const api = {
         request<TxResult>('/actions/liquidate', {
             method: 'POST',
             body: JSON.stringify({ victimCollateral, victimDebt }),
+        }),
+
+    // pUSD Token
+    getPUSDBalance: (publicKey?: string) =>
+        request<{ balance: string }>(`/token/balance${publicKey ? `?publicKey=${encodeURIComponent(publicKey)}` : ''}`),
+
+    transferPUSD: (to: string, amount: string) =>
+        request<TxResult>('/token/transfer', {
+            method: 'POST',
+            body: JSON.stringify({ to, amount }),
+        }),
+
+    approvePUSD: (spender: string, amount: string) =>
+        request<TxResult>('/token/approve', {
+            method: 'POST',
+            body: JSON.stringify({ spender, amount }),
+        }),
+
+    transferPUSDFrom: (from: string, to: string, amount: string) =>
+        request<TxResult>('/token/transfer-from', {
+            method: 'POST',
+            body: JSON.stringify({ from, to, amount }),
         }),
 };
 

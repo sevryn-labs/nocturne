@@ -123,9 +123,9 @@ const ZKRow: React.FC<{ type: 'private' | 'public'; label: string; sublabel: str
 
 const Tag: React.FC<{ type: 'revealed' | 'hidden' | 'none'; children: React.ReactNode }> = ({ type, children }) => {
     const s: Record<string, React.CSSProperties> = {
-        revealed: { background: 'rgba(255,92,92,0.1)',    border: '1px solid rgba(255,92,92,0.22)',    color: 'var(--status-error)' },
-        hidden:   { background: 'rgba(108,99,255,0.1)',   border: '1px solid rgba(108,99,255,0.22)',   color: '#8B85FF' },
-        none:     { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', fontWeight: 400 },
+        revealed: { background: 'rgba(255,92,92,0.1)', border: '1px solid rgba(255,92,92,0.22)', color: 'var(--status-error)' },
+        hidden: { background: 'rgba(108,99,255,0.1)', border: '1px solid rgba(108,99,255,0.22)', color: '#8B85FF' },
+        none: { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text-muted)', fontWeight: 400 },
     };
     return <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, fontFamily: 'monospace', ...s[type] }}>{children}</span>;
 };
@@ -134,7 +134,7 @@ const Tag: React.FC<{ type: 'revealed' | 'hidden' | 'none'; children: React.Reac
 
 const Landing: React.FC = () => {
     const { state } = useApp();
-    const navigate  = useNavigate();
+    const navigate = useNavigate();
     const [visible, setVisible] = useState(false);
     useEffect(() => { const t = setTimeout(() => setVisible(true), 60); return () => clearTimeout(t); }, []);
 
@@ -147,20 +147,20 @@ const Landing: React.FC = () => {
     });
 
     const DISCLOSURE_ROWS = [
-        { circuit: 'depositCollateral',  revealed: ['amount'],                        hidden: ['collateral'],         constraint: 'amount > 0'          },
-        { circuit: 'mintPUSD',           revealed: ['amount'],                        hidden: ['collateral', 'debt'], constraint: 'C × 100 ≥ D′ × 150' },
-        { circuit: 'repayPUSD',          revealed: ['amount'],                        hidden: ['debt'],               constraint: 'debtAmount ≥ amount' },
-        { circuit: 'withdrawCollateral', revealed: ['amount'],                        hidden: ['collateral', 'debt'], constraint: 'C′ × 100 ≥ D × 150' },
-        { circuit: 'liquidate',          revealed: ['victimCollateral','victimDebt'], hidden: [],                     constraint: 'Vc × 100 < Vd × 150' },
+        { circuit: 'depositCollateral', revealed: ['amount'], hidden: ['collateral'], constraint: 'amount > 0' },
+        { circuit: 'mintPUSD', revealed: ['amount'], hidden: ['collateral', 'debt'], constraint: 'C × 100 ≥ D′ × 150' },
+        { circuit: 'repayPUSD', revealed: ['amount'], hidden: ['debt'], constraint: 'debtAmount ≥ amount' },
+        { circuit: 'withdrawCollateral', revealed: ['amount'], hidden: ['collateral', 'debt'], constraint: 'C′ × 100 ≥ D × 150' },
+        { circuit: 'liquidate', revealed: ['victimCollateral', 'victimDebt'], hidden: [], constraint: 'Vc × 100 < Vd × 150' },
     ];
 
     const LIMITS = [
-        { title: 'No Price Oracle',         body: 'Collateral is valued at nominal integer quantity with no exchange rate to external assets.' },
-        { title: 'No Interest Accrual',     body: 'Effective interest rate is 0%. Debt stays constant until explicitly repaid or liquidated.' },
-        { title: 'No pUSD Token',           body: 'pUSD is a ledger counter — not a transferable token. No secondary market exists.' },
-        { title: 'No Partial Liquidation',  body: 'The liquidate circuit consumes the entire reported position. No fractional liquidations.' },
-        { title: 'No Governance',           body: 'liquidationRatio and mintingRatio are immutable post-deployment. No admin key or upgrade path.' },
+        { title: 'No Price Oracle', body: 'Collateral is valued at nominal integer quantity with no exchange rate to external assets.' },
+        { title: 'No Interest Accrual', body: 'Effective interest rate is 0%. Debt stays constant until explicitly repaid or liquidated.' },
+        { title: 'No Partial Liquidation', body: 'The liquidate circuit consumes the entire reported position. No fractional liquidations.' },
+        { title: 'No Governance', body: 'liquidationRatio and mintingRatio are immutable post-deployment. No admin key or upgrade path.' },
         { title: 'Private State Staleness', body: 'Liquidated positions are not auto-invalidated in local LevelDB. Stale witness values may persist.' },
+        { title: 'No Contract-to-Contract', body: 'Midnight does not yet support C2C calls. pUSD transfers are restricted to wallet addresses.' },
     ];
 
     return (
@@ -174,7 +174,7 @@ const Landing: React.FC = () => {
                     <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '17px', letterSpacing: '-0.03em' }}>pUSD Protocol</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '28px' }}>
-                    {[['#how','How It Works'],['#circuits','Circuits'],['#privacy','Privacy']].map(([href, label]) => (
+                    {[['#how', 'How It Works'], ['#circuits', 'Circuits'], ['#privacy', 'Privacy']].map(([href, label]) => (
                         <a key={href} href={href} style={{ color: 'var(--text-secondary)', fontSize: '14px', fontWeight: 500, textDecoration: 'none', transition: 'color 0.2s' }}
                             onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
                             onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-secondary)')}>
@@ -219,10 +219,10 @@ const Landing: React.FC = () => {
                 <div style={{ ...fade(0.36), display: 'flex', gap: '48px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '80px', paddingTop: '48px', borderTop: '1px solid rgba(200,214,232,0.07)' }}>
                     {[
                         { val: '150%', label: 'Min Collateral Ratio', color: 'var(--moon-silver)' },
-                        { val: '5',    label: 'ZK Circuits',          color: '#8B85FF' },
-                        { val: '0%',   label: 'Interest Rate',        color: 'var(--accent-secondary)' },
-                        { val: '0',    label: 'Admin Keys',           color: 'var(--moon-silver)' },
-                        { val: '30',   label: 'Passing Tests',        color: '#8B85FF' },
+                        { val: '8', label: 'ZK Circuits', color: '#8B85FF' },
+                        { val: '0%', label: 'Interest Rate', color: 'var(--accent-secondary)' },
+                        { val: '0', label: 'Admin Keys', color: 'var(--moon-silver)' },
+                        { val: '30', label: 'Passing Tests', color: '#8B85FF' },
                     ].map(s => (
                         <div key={s.label} style={{ textAlign: 'center' }}>
                             <div style={{ fontFamily: 'var(--font-heading)', fontSize: '34px', fontWeight: 800, letterSpacing: '-0.04em', color: s.color, lineHeight: 1 }}>{s.val}</div>
@@ -241,10 +241,10 @@ const Landing: React.FC = () => {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                         {[
-                            { n:'01', icon:'🌑', iconBg:'rgba(200,214,232,0.07)', iconBorder:'rgba(200,214,232,0.15)', title:'Lock tNight as Collateral',   body:'Deposit Midnight testnet tokens. Your collateral balance is stored exclusively in client-side LevelDB — never published to the ledger.' },
-                            { n:'02', icon:'✦',  iconBg:'rgba(0,229,255,0.07)',   iconBorder:'rgba(0,229,255,0.18)',   title:'Mint pUSD Credit',            body:'Generate pUSD against your collateral. A ZK proof certifies your ratio ≥ 150% without revealing how much tNight you hold.' },
-                            { n:'03', icon:'↺',  iconBg:'rgba(108,99,255,0.07)', iconBorder:'rgba(108,99,255,0.2)',  title:'Repay & Withdraw Freely',     body:'Repay debt and reclaim collateral at any time. Every operation enforces safety constraints in-circuit — no trusted intermediary.' },
-                            { n:'04', icon:'⚡', iconBg:'rgba(255,92,92,0.07)',   iconBorder:'rgba(255,92,92,0.18)', title:'Permissionless Liquidation',  body:'Anyone can liquidate a position whose ratio drops below 150%. Exactly 150% is protected — the circuit uses strict inequality.' },
+                            { n: '01', icon: '🌑', iconBg: 'rgba(200,214,232,0.07)', iconBorder: 'rgba(200,214,232,0.15)', title: 'Lock tNight as Collateral', body: 'Deposit Midnight testnet tokens. Your collateral balance is stored exclusively in client-side LevelDB — never published to the ledger.' },
+                            { n: '02', icon: '❦', iconBg: 'rgba(0,229,255,0.07)', iconBorder: 'rgba(0,229,255,0.18)', title: 'Mint pUSD — A Real Token', body: 'Generate pUSD tokens against your collateral. A ZK proof certifies your ratio ≥ 150% without revealing how much tNight you hold. pUSD is fully transferable.' },
+                            { n: '03', icon: '↺', iconBg: 'rgba(108,99,255,0.07)', iconBorder: 'rgba(108,99,255,0.2)', title: 'Repay & Withdraw Freely', body: 'Repay debt and reclaim collateral at any time. Every operation enforces safety constraints in-circuit — no trusted intermediary.' },
+                            { n: '04', icon: '⚡', iconBg: 'rgba(255,92,92,0.07)', iconBorder: 'rgba(255,92,92,0.18)', title: 'Permissionless Liquidation', body: 'Anyone can liquidate a position whose ratio drops below 150%. Exactly 150% is protected — the circuit uses strict inequality.' },
                         ].map(c => (
                             <LandingCard key={c.n}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
@@ -269,13 +269,13 @@ const Landing: React.FC = () => {
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>What's visible vs. hidden</div>
-                                    <ZKRow type="private" label="ZK-Proven Private"  sublabel="Your collateral · Your debt · Your wallet" />
+                                    <ZKRow type="private" label="ZK-Proven Private" sublabel="Your collateral · Your debt · Your wallet" />
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                         <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, rgba(108,99,255,0.3))' }} />
                                         <div style={{ padding: '4px 12px', borderRadius: '20px', background: 'rgba(108,99,255,0.1)', border: '1px solid rgba(108,99,255,0.3)', fontSize: '11px', fontWeight: 700, color: 'var(--accent-primary)', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>ZK Proof</div>
                                         <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, rgba(0,229,255,0.25), transparent)' }} />
                                     </div>
-                                    <ZKRow type="public"  label="Publicly Auditable" sublabel="Total collateral · Total debt · Ratios" />
+                                    <ZKRow type="public" label="Publicly Auditable" sublabel="Total collateral · Total debt · Ratios" />
                                     <div style={{ marginTop: '8px', padding: '14px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
                                         Proofs are generated locally. The proof server (Docker, port 6300) is stateless and receives only circuit inputs — never your raw private state.
                                     </div>
@@ -295,11 +295,11 @@ const Landing: React.FC = () => {
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '14px', marginBottom: '64px' }}>
                         {[
-                            { name:'depositCollateral',  label:'Deposit',   icon:'🌑', color:'var(--moon-silver)',      bg:'rgba(200,214,232,0.06)', border:'rgba(200,214,232,0.15)' },
-                            { name:'mintPUSD',           label:'Mint',      icon:'✦',  color:'var(--accent-secondary)', bg:'rgba(0,229,255,0.06)',   border:'rgba(0,229,255,0.18)'   },
-                            { name:'repayPUSD',          label:'Repay',     icon:'↺',  color:'#8B85FF',                 bg:'rgba(108,99,255,0.07)',  border:'rgba(108,99,255,0.2)'   },
-                            { name:'withdrawCollateral', label:'Withdraw',  icon:'↑',  color:'var(--status-warning)',   bg:'rgba(255,184,77,0.07)',  border:'rgba(255,184,77,0.2)'   },
-                            { name:'liquidate',          label:'Liquidate', icon:'⚡', color:'var(--status-error)',     bg:'rgba(255,92,92,0.07)',   border:'rgba(255,92,92,0.18)'   },
+                            { name: 'depositCollateral', label: 'Deposit', icon: '🌑', color: 'var(--moon-silver)', bg: 'rgba(200,214,232,0.06)', border: 'rgba(200,214,232,0.15)' },
+                            { name: 'mintPUSD', label: 'Mint', icon: '✦', color: 'var(--accent-secondary)', bg: 'rgba(0,229,255,0.06)', border: 'rgba(0,229,255,0.18)' },
+                            { name: 'repayPUSD', label: 'Repay', icon: '↺', color: '#8B85FF', bg: 'rgba(108,99,255,0.07)', border: 'rgba(108,99,255,0.2)' },
+                            { name: 'withdrawCollateral', label: 'Withdraw', icon: '↑', color: 'var(--status-warning)', bg: 'rgba(255,184,77,0.07)', border: 'rgba(255,184,77,0.2)' },
+                            { name: 'liquidate', label: 'Liquidate', icon: '⚡', color: 'var(--status-error)', bg: 'rgba(255,92,92,0.07)', border: 'rgba(255,92,92,0.18)' },
                         ].map(c => (
                             <div key={c.name} style={{ padding: '22px 16px', textAlign: 'center', borderRadius: '16px', background: 'var(--bg-primary)', border: `1px solid ${c.border}`, transition: 'transform 0.2s' }}
                                 onMouseEnter={e => (e.currentTarget.style.transform = 'translateY(-3px)')}
@@ -313,9 +313,9 @@ const Landing: React.FC = () => {
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '18px' }}>
                         {[
-                            { n:'INVARIANT 01', icon:'🔒', title:'No Undercollateralised Minting', body:'The mintPUSD circuit enforces that new debt cannot push your ratio below 150% — enforced in zero knowledge, cannot be bypassed.', formula:'C × 100 ≥ D′ × 150' },
-                            { n:'INVARIANT 02', icon:'◎',  title:'No Over-Withdrawal',             body:'Withdrawing collateral is only permitted if the remaining ratio still clears 150%. Branchless design reveals nothing about debt status.', formula:'C′ × 100 ≥ D × 150' },
-                            { n:'INVARIANT 03', icon:'⚡', title:'Strict Liquidation Threshold',   body:'Positions at exactly 150% are explicitly protected. Only strict undercollateralisation triggers the circuit.', formula:'Vc × 100 < Vd × 150' },
+                            { n: 'INVARIANT 01', icon: '🔒', title: 'No Undercollateralised Minting', body: 'The mintPUSD circuit enforces that new debt cannot push your ratio below 150% — enforced in zero knowledge, cannot be bypassed.', formula: 'C × 100 ≥ D′ × 150' },
+                            { n: 'INVARIANT 02', icon: '◎', title: 'No Over-Withdrawal', body: 'Withdrawing collateral is only permitted if the remaining ratio still clears 150%. Branchless design reveals nothing about debt status.', formula: 'C′ × 100 ≥ D × 150' },
+                            { n: 'INVARIANT 03', icon: '⚡', title: 'Strict Liquidation Threshold', body: 'Positions at exactly 150% are explicitly protected. Only strict undercollateralisation triggers the circuit.', formula: 'Vc × 100 < Vd × 150' },
                         ].map(g => (
                             <LandingCard key={g.n}>
                                 <div style={{ fontFamily: 'monospace', fontSize: '10px', color: 'var(--text-muted)', letterSpacing: '0.08em', marginBottom: '14px' }}>{g.n}</div>
@@ -339,7 +339,7 @@ const Landing: React.FC = () => {
                     </p>
                     <div style={{ borderRadius: '18px', overflow: 'hidden', border: '1px solid rgba(200,214,232,0.07)' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', padding: '13px 24px', background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(200,214,232,0.07)' }}>
-                            {['Circuit','Revealed On-Chain','ZK-Proven (Hidden)','Key Constraint'].map(h => (
+                            {['Circuit', 'Revealed On-Chain', 'ZK-Proven (Hidden)', 'Key Constraint'].map(h => (
                                 <span key={h} style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>{h}</span>
                             ))}
                         </div>
@@ -419,10 +419,11 @@ const NAV_ICONS: Record<string, string> = {
 
 const Sidebar: React.FC = () => {
     const { state } = useApp();
-    const hasWallet   = !!state.wallet;
+    const hasWallet = !!state.wallet;
     const hasContract = !!state.contractAddress;
     const totalCollateral = state.protocol ? BigInt(state.protocol.totalCollateral).toLocaleString() : '0';
-    const totalDebt       = state.protocol ? BigInt(state.protocol.totalDebt).toLocaleString()       : '0';
+    const totalDebt = state.protocol ? BigInt(state.protocol.totalDebt).toLocaleString() : '0';
+    const totalSupply = state.protocol?.totalSupply ? BigInt(state.protocol.totalSupply).toLocaleString() : totalDebt;
 
     return (
         <aside className="sidebar">
@@ -471,6 +472,11 @@ const Sidebar: React.FC = () => {
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Debt</span>
                         <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'monospace' }}>{totalDebt} pUSD</span>
                     </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Token Supply</span>
+                        <span style={{ fontSize: '12px', color: 'var(--accent-secondary)', fontFamily: 'monospace' }}>{totalSupply} pUSD</span>
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', opacity: 0.5, textAlign: 'right', fontFamily: 'monospace' }}>supply == debt ✓</div>
                 </div>
             </div>
         </aside>
@@ -519,7 +525,7 @@ const TopBar: React.FC = () => {
                     </span>
                 </div>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center', padding: '7px 12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px' }}>
-                    <StatusDot connected={!!state.health}  title="Network Health" />
+                    <StatusDot connected={!!state.health} title="Network Health" />
                     <StatusDot connected={!!state.wallet} title="Wallet Status" />
                 </div>
             </div>
@@ -545,16 +551,16 @@ const AppFooter: React.FC = () => (
 // ─── Celestial background (app shell) ────────────────────────────────────────
 
 const TWINKLE_STARS = [
-    { x:'12%',y:'8%', size:'2px',   duration:'3.5s',delay:'0s',   opacity:0.7  },
-    { x:'28%',y:'22%',size:'1.5px', duration:'5s',  delay:'1.2s', opacity:0.5  },
-    { x:'45%',y:'6%', size:'2px',   duration:'4s',  delay:'2.1s', opacity:0.6  },
-    { x:'62%',y:'15%',size:'1px',   duration:'6s',  delay:'0.5s', opacity:0.4  },
-    { x:'78%',y:'30%',size:'1.5px', duration:'4.5s',delay:'3s',   opacity:0.55 },
-    { x:'91%',y:'9%', size:'2px',   duration:'3s',  delay:'1.8s', opacity:0.65 },
-    { x:'5%', y:'55%',size:'1px',   duration:'7s',  delay:'0.8s', opacity:0.35 },
-    { x:'35%',y:'80%',size:'1.5px', duration:'5.5s',delay:'2.5s', opacity:0.45 },
-    { x:'70%',y:'70%',size:'1px',   duration:'4s',  delay:'1s',   opacity:0.4  },
-    { x:'88%',y:'60%',size:'2px',   duration:'6s',  delay:'3.5s', opacity:0.6  },
+    { x: '12%', y: '8%', size: '2px', duration: '3.5s', delay: '0s', opacity: 0.7 },
+    { x: '28%', y: '22%', size: '1.5px', duration: '5s', delay: '1.2s', opacity: 0.5 },
+    { x: '45%', y: '6%', size: '2px', duration: '4s', delay: '2.1s', opacity: 0.6 },
+    { x: '62%', y: '15%', size: '1px', duration: '6s', delay: '0.5s', opacity: 0.4 },
+    { x: '78%', y: '30%', size: '1.5px', duration: '4.5s', delay: '3s', opacity: 0.55 },
+    { x: '91%', y: '9%', size: '2px', duration: '3s', delay: '1.8s', opacity: 0.65 },
+    { x: '5%', y: '55%', size: '1px', duration: '7s', delay: '0.8s', opacity: 0.35 },
+    { x: '35%', y: '80%', size: '1.5px', duration: '5.5s', delay: '2.5s', opacity: 0.45 },
+    { x: '70%', y: '70%', size: '1px', duration: '4s', delay: '1s', opacity: 0.4 },
+    { x: '88%', y: '60%', size: '2px', duration: '6s', delay: '3.5s', opacity: 0.6 },
 ];
 
 const CelestialBg: React.FC = () => (
@@ -610,10 +616,10 @@ const AppContent: React.FC = () => {
             <Route path="/" element={<Landing />} />
 
             {/* App routes — wrapped in sidebar/topbar shell */}
-            <Route path="/setup"        element={<AppShell><Setup /></AppShell>} />
-            <Route path="/dashboard"    element={<AppShell><Dashboard /></AppShell>} />
-            <Route path="/position"     element={<AppShell><Position /></AppShell>} />
-            <Route path="/actions"      element={<AppShell><Actions /></AppShell>} />
+            <Route path="/setup" element={<AppShell><Setup /></AppShell>} />
+            <Route path="/dashboard" element={<AppShell><Dashboard /></AppShell>} />
+            <Route path="/position" element={<AppShell><Position /></AppShell>} />
+            <Route path="/actions" element={<AppShell><Actions /></AppShell>} />
             <Route path="/how-it-works" element={<AppShell><HowItWorks /></AppShell>} />
 
             {/* Unknown paths → landing */}

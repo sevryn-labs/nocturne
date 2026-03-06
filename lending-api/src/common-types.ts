@@ -25,6 +25,8 @@ export interface ProtocolState {
     totalDebt: bigint;
     liquidationRatio: bigint;
     mintingRatio: bigint;
+    /** pUSD token total supply — always equals totalDebt (supply == debt invariant) */
+    totalSupply: bigint;
 }
 
 export interface UserPosition {
