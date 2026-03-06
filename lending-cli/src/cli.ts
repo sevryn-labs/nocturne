@@ -17,6 +17,8 @@ import { type StartedDockerComposeEnvironment, type DockerComposeEnvironment } f
 import { type LendingProviders, type DeployedLendingContract } from './common-types.js';
 import { type Config, StandaloneConfig } from './config.js';
 import * as api from './api.js';
+import { MidnightBech32m, UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk-address-format';
+import { getNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 
 let logger: Logger;
 
@@ -77,7 +79,9 @@ ${DIVIDER}
   [5] Liquidate            (claim undercollateralised position)
   [6] View Protocol State  (public totals)
   [7] View My Position     (private balance)
-  [8] Exit
+  [8] View Wallet Balances (tNight & pUSD)
+  [9] Transfer pUSD        (send tokens to another unshielded address)
+  [10] Exit
 ${'─'.repeat(66)}
 > `;
 
@@ -139,6 +143,23 @@ ${DIVIDER}
 ${DIVIDER}`);
   } catch (e) {
     console.log(`  ✗ Could not read position: ${e instanceof Error ? e.message : String(e)}\n`);
+  }
+};
+
+// ─── Wallet Balances Display ──────────────────────────────────────────────────
+
+const displayWalletBalances = async (providers: LendingProviders, walletCtx: WalletContext, contractAddress: string): Promise<void> => {
+  console.log('');
+  try {
+    const balances = await api.getWalletBalances(providers, walletCtx, contractAddress as any);
+    console.log(`${DIVIDER}
+  Wallet Balances
+${DIVIDER}
+  tNight (Unshielded) : ${balances.tNight.toLocaleString()}
+  pUSD (Shielded API) : ${balances.pUSD.toLocaleString()}
+${DIVIDER}`);
+  } catch (e) {
+    console.log(`  ✗ Could not read wallet balances: ${e instanceof Error ? e.message : String(e)}\n`);
   }
 };
 
@@ -392,8 +413,43 @@ const lendingLoop = async (
         await displayPosition(providers, contractAddress);
         break;
 
-      // ── [8] Exit ─────────────────────────────────────────────────────────
+      // ── [8] View Wallet Balances ─────────────────────────────────────────
       case '8':
+        await displayWalletBalances(providers, walletCtx, contractAddress);
+        break;
+
+      // ── [9] Transfer pUSD ────────────────────────────────────────────────
+      case '9': {
+        const address = await rli.question('  Enter destination unshielded address (mn_addr_...): ');
+        if (!address.trim()) break;
+
+        let toPublicKeyHex: string;
+        try {
+          const bech32Address = MidnightBech32m.parse(address.trim());
+          const unshielded = UnshieldedAddress.codec.decode(getNetworkId(), bech32Address);
+          toPublicKeyHex = unshielded.data.toString('hex');
+        } catch (e) {
+          console.log('  ✗ Invalid unshielded address format\n');
+          break;
+        }
+
+        const amount = await promptAmount(rli, 'pUSD to transfer');
+        if (!amount) break;
+
+        try {
+          const tx = await api.withStatus(`Transferring ${amount.toLocaleString()} pUSD`, () =>
+            api.transferPUSD(lendingContract, toPublicKeyHex, amount),
+          );
+          console.log(`  ✓ Transferred — tx ${tx.txId} in block ${tx.blockHeight}\n`);
+          await displayPosition(providers, contractAddress);
+        } catch (e) {
+          showError('Transfer', e);
+        }
+        break;
+      }
+
+      // ── [10] Exit ────────────────────────────────────────────────────────
+      case '10':
         return;
 
       default:

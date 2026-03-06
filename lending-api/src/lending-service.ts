@@ -100,6 +100,9 @@ export class LendingService {
     private contractAddress: string | null = null;
     private seed: string | null = null;
     private config: Config;
+    private walletInitPromise: Promise<WalletInfo> | null = null;
+    private contractJoinPromise: Promise<string> | null = null;
+    private contractDeployPromise: Promise<string> | null = null;
 
     constructor(config: Config) {
         this.config = config;
@@ -122,6 +125,23 @@ export class LendingService {
     // ─── Wallet ──────────────────────────────────────────────────────────────
 
     async initializeWallet(existingSeed?: string): Promise<WalletInfo> {
+        if (this.walletCtx && this.providers) {
+            return this.getWalletInfo();
+        }
+
+        if (this.walletInitPromise) {
+            return this.walletInitPromise;
+        }
+
+        this.walletInitPromise = this._initializeWalletInternal(existingSeed);
+        try {
+            return await this.walletInitPromise;
+        } finally {
+            this.walletInitPromise = null;
+        }
+    }
+
+    private async _initializeWalletInternal(existingSeed?: string): Promise<WalletInfo> {
         const seed = existingSeed ?? toHex(Buffer.from(generateRandomSeed()));
         this.seed = seed;
 
@@ -154,6 +174,14 @@ export class LendingService {
 
         // Configure providers
         await this.configureProviders();
+
+        // Warm up the LevelDB instance sequentially so later concurrent API requests 
+        // don't try to lazy-open it at the exact same time
+        try {
+            await this.providers!.privateStateProvider.get(LendingPrivateStateId);
+        } catch {
+            // Ignore if it fails, it just means the state isn't there yet, but DB is opened.
+        }
 
         return this.buildWalletInfo(state);
     }
@@ -226,30 +254,52 @@ export class LendingService {
     async deployContract(): Promise<string> {
         this.requireProviders();
 
-        const contract = await deployContract(this.providers!, {
-            compiledContract: lendingCompiledContract,
-            privateStateId: LendingPrivateStateId,
-            initialPrivateState: initialLendingPrivateState,
-        });
+        if (this.contractDeployPromise) return this.contractDeployPromise;
 
-        this.contract = contract;
-        this.contractAddress = contract.deployTxData.public.contractAddress;
-        return this.contractAddress;
+        this.contractDeployPromise = (async () => {
+            try {
+                const contract = await deployContract(this.providers!, {
+                    compiledContract: lendingCompiledContract,
+                    privateStateId: LendingPrivateStateId,
+                    initialPrivateState: initialLendingPrivateState,
+                });
+
+                this.contract = contract;
+                this.contractAddress = contract.deployTxData.public.contractAddress;
+                return this.contractAddress;
+            } finally {
+                this.contractDeployPromise = null;
+            }
+        })();
+
+        return this.contractDeployPromise;
     }
 
     async joinContract(address: string): Promise<string> {
         this.requireProviders();
 
-        const contract = await findDeployedContract(this.providers!, {
-            contractAddress: address,
-            compiledContract: lendingCompiledContract,
-            privateStateId: LendingPrivateStateId,
-            initialPrivateState: initialLendingPrivateState,
-        });
+        if (this.contractAddress === address) return this.contractAddress;
 
-        this.contract = contract;
-        this.contractAddress = contract.deployTxData.public.contractAddress;
-        return this.contractAddress;
+        if (this.contractJoinPromise) return this.contractJoinPromise;
+
+        this.contractJoinPromise = (async () => {
+            try {
+                const contract = await findDeployedContract(this.providers!, {
+                    contractAddress: address,
+                    compiledContract: lendingCompiledContract,
+                    privateStateId: LendingPrivateStateId,
+                    initialPrivateState: initialLendingPrivateState,
+                });
+
+                this.contract = contract;
+                this.contractAddress = contract.deployTxData.public.contractAddress;
+                return this.contractAddress;
+            } finally {
+                this.contractJoinPromise = null;
+            }
+        })();
+
+        return this.contractJoinPromise;
     }
 
     // ─── Public State ────────────────────────────────────────────────────────
@@ -423,8 +473,9 @@ export class LendingService {
     async transferPUSD(toPublicKeyHex: string, amount: bigint): Promise<TxResult> {
         this.requireContract();
         if (amount <= 0n) throw new Error('Transfer amount must be positive');
+        const to = { bytes: Uint8Array.from(Buffer.from(toPublicKeyHex, 'hex')) };
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        const txData = await (this.contract!.callTx as any).transfer(toPublicKeyHex, amount);
+        const txData = await (this.contract!.callTx as any).transfer(to, amount);
         return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 
@@ -433,8 +484,9 @@ export class LendingService {
      */
     async approvePUSD(spenderPublicKeyHex: string, amount: bigint): Promise<TxResult> {
         this.requireContract();
+        const spender = { bytes: Uint8Array.from(Buffer.from(spenderPublicKeyHex, 'hex')) };
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        const txData = await (this.contract!.callTx as any).approve(spenderPublicKeyHex, amount);
+        const txData = await (this.contract!.callTx as any).approve(spender, amount);
         return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 
@@ -444,8 +496,10 @@ export class LendingService {
     async transferPUSDFrom(fromPublicKeyHex: string, toPublicKeyHex: string, amount: bigint): Promise<TxResult> {
         this.requireContract();
         if (amount <= 0n) throw new Error('Transfer amount must be positive');
+        const fromObj = { bytes: Uint8Array.from(Buffer.from(fromPublicKeyHex, 'hex')) };
+        const toObj = { bytes: Uint8Array.from(Buffer.from(toPublicKeyHex, 'hex')) };
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-        const txData = await (this.contract!.callTx as any).transferFrom(fromPublicKeyHex, toPublicKeyHex, amount);
+        const txData = await (this.contract!.callTx as any).transferFrom(fromObj, toObj, amount);
         return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 

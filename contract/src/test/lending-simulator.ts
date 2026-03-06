@@ -11,6 +11,7 @@ import {
     sampleContractAddress,
     createConstructorContext,
     createCircuitContext,
+    ownPublicKey,
 } from '@midnight-ntwrk/compact-runtime';
 
 import {
@@ -53,6 +54,10 @@ export class LendingSimulator {
 
     public getPrivateState(): LendingPrivateState {
         return this.circuitContext.currentPrivateState;
+    }
+
+    public getOwnPublicKey(): { bytes: Uint8Array } {
+        return ownPublicKey(this.circuitContext) as { bytes: Uint8Array };
     }
 
     // ─── Private State Update ───────────────────────────────────────────────────
@@ -123,5 +128,41 @@ export class LendingSimulator {
             .liquidate(this.circuitContext, victimCollateral, victimDebt)
             .context;
         return this.getLedger();
+    }
+
+    // ─── Token Circuits ─────────────────────────────────────────────────────────
+
+    public decimals(): bigint {
+        return this.contract.impureCircuits.decimals(this.circuitContext).result;
+    }
+
+    public totalSupply(): bigint {
+        return this.contract.impureCircuits.totalSupply(this.circuitContext).result;
+    }
+
+    public balanceOf(account: { bytes: Uint8Array }): bigint {
+        return this.contract.impureCircuits.balanceOf(this.circuitContext, account).result;
+    }
+
+    public allowance(owner: { bytes: Uint8Array }, spender: { bytes: Uint8Array }): bigint {
+        return this.contract.impureCircuits.allowance(this.circuitContext, owner, spender).result;
+    }
+
+    public transfer(to: { bytes: Uint8Array }, value: bigint): boolean {
+        const { context, result } = this.contract.impureCircuits.transfer(this.circuitContext, to, value);
+        this.circuitContext = context;
+        return result;
+    }
+
+    public approve(spender: { bytes: Uint8Array }, value: bigint): boolean {
+        const { context, result } = this.contract.impureCircuits.approve(this.circuitContext, spender, value);
+        this.circuitContext = context;
+        return result;
+    }
+
+    public transferFrom(from: { bytes: Uint8Array }, to: { bytes: Uint8Array }, value: bigint): boolean {
+        const { context, result } = this.contract.impureCircuits.transferFrom(this.circuitContext, from, to, value);
+        this.circuitContext = context;
+        return result;
     }
 }

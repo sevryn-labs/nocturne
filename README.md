@@ -1,6 +1,6 @@
 # pUSD Lending Protocol
 
-[![Generic badge](https://img.shields.io/badge/Compact%20Toolchain-0.28.0-1abc9c.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/midnight--js-3.0.0-blueviolet.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/wallet--sdk--facade-1.0.0-blue.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Tests-30%20passing-brightgreen.svg)](https://shields.io/)
+[![Generic badge](https://img.shields.io/badge/Compact%20Toolchain-0.28.0-1abc9c.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/midnight--js-3.0.0-blueviolet.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/wallet--sdk--facade-1.0.0-blue.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Tests-48%20passing-brightgreen.svg)](https://shields.io/)
 
 A **privacy-preserving collateralised lending protocol** built on the [Midnight Network](https://midnight.network). Deposit tNight as collateral, mint pUSD synthetic stablecoins, and maintain positions privately via zero-knowledge proofs — individual debt and collateral amounts are never exposed on-chain.
 
@@ -56,10 +56,12 @@ All rules are enforced entirely inside the Compact ZK circuit — no off-chain t
 | Data | Visibility | Reason |
 |------|-----------|--------|
 | `totalCollateral` | 🌐 Public | Protocol solvency audit |
-| `totalDebt` | 🌐 Public | Verify no unbacked pUSD |
+| `totalDebt` | 🌐 Public | Verify no unbacked pUSD (`totalSupply == totalDebt`) |
+| `totalSupply` | 🌐 Public | The aggregate supply of the fungible pUSD token |
 | `liquidationRatio` / `mintingRatio` | 🌐 Public | Transparent risk parameter |
 | **Your collateral** | 🔒 Private | Hidden in ZK — never on-chain |
 | **Your debt** | 🔒 Private | Hidden in ZK — never on-chain |
+| **pUSD Balances** | 🌐 Public | ERC20-style transparent balances on-chain |
 | **Your identity** | 🔒 Private | Pseudonymous (Midnight public key only) |
 
 Private state lives in a user-controlled local LevelDB database and is supplied to ZK circuits via **witness** functions. The Compact runtime generates a zero-knowledge proof that constraints hold without revealing actual values.
@@ -132,7 +134,7 @@ lending_protocol/
 │   │       └── zkir/                      #   Circuit IR files
 │   └── src/test/
 │       ├── lending-simulator.ts           # In-memory test harness (no network)
-│       └── lending.test.ts                # 30 unit tests (vitest)
+│       └── lending.test.ts                # 48 unit tests (vitest)
 │
 ├── lending-api/                           # REST API server (NEW)
 │   ├── package.json                       # @midnight-ntwrk/lending-api
@@ -229,17 +231,24 @@ npm install
 cd contract
 npm run compact    # compile Compact → ZK circuits + TypeScript bindings
 npm run build      # tsc compile
-npm run test       # run 30 unit tests (no network required)
+npm run test       # run 48 unit tests (no network required)
 ```
 
 Expected output from `npm run compact`:
 
 ```
+  circuit "allowance"         (k=10, rows=634)
+  circuit "approve"           (k=10, rows=711)
+  circuit "balanceOf"         (k=9, rows=344)
+  circuit "decimals"          (k=6, rows=26)
   circuit "depositCollateral" (k=9, rows=201)
-  circuit "mintPUSD"          (k=9, rows=330)
-  circuit "repayPUSD"         (k=9, rows=226)
+  circuit "liquidate"         (k=10, rows=724)
+  circuit "mintPUSD"          (k=10, rows=909)
+  circuit "repayPUSD"         (k=10, rows=634)
+  circuit "totalSupply"       (k=6, rows=26)
+  circuit "transfer"          (k=10, rows=1013)
+  circuit "transferFrom"      (k=11, rows=1482)
   circuit "withdrawCollateral"(k=9, rows=354)
-  circuit "liquidate"         (k=9, rows=316)
 ```
 
 > The first run downloads zero-knowledge parameters (~500 MB). This is a one-time download cached at `~/.compact/`.
@@ -515,16 +524,23 @@ npm test
 ```
 
 ```
- ✓ src/test/lending.test.ts (30 tests) 363ms
-   ✓ Lending contract — Initialisation (4)
-   ✓ depositCollateral (4)
-   ✓ mintPUSD (6)
-   ✓ repayPUSD (4)
-   ✓ withdrawCollateral (6)
-   ✓ liquidate (4)
-   ✓ End-to-end: Deposit → Mint → Repay → Withdraw (2)
+ ✓ src/test/lending.test.ts (48 tests) 1018ms
+   ✓ 1. Contract Initialization (3)
+   ✓ 2. Collateral Management (depositCollateral) (5)
+   ✓ 3. Minting Tests (mintPUSD) (5)
+   ✓ 4. Repayment Tests (repayPUSD) (5)
+   ✓ 5. Withdraw Collateral Tests (withdrawCollateral) (5)
+   ✓ 6. Liquidation Tests (liquidate) (4)
+   ✓ 7. Token Transfer Tests (transfer) (6)
+   ✓ 8. Allowance + Approval Tests (approve) (4)
+   ✓ 9. transferFrom Tests (transferFrom) (5)
+   ✓ 10. Multi-user System Tests (1)
+   ✓ 11. Protocol Invariant Tests (1)
+   ✓ 12. Sequential Workflow Tests (2)
+   ✓ 13. Boundary Tests (1)
+   ✓ 14. Randomized / Fuzz Tests (1)
 
- Tests  30 passed (30)
+ Tests  48 passed (48)
 ```
 
 Tests run against the `LendingSimulator` — an in-memory harness that wraps the Compact-generated contract. No Midnight node, no proof server, no Docker needed.

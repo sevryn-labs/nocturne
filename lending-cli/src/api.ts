@@ -160,6 +160,24 @@ export const getPUSDBalance = async (
 };
 
 /**
+ * Returns the raw wallet balances for tNight (from the unshielded wallet) 
+ * and pUSD (from the protocol public ledger for this user's shielded key).
+ */
+export const getWalletBalances = async (
+  providers: LendingProviders,
+  walletCtx: WalletContext,
+  contractAddress: ContractAddress,
+): Promise<{ tNight: bigint; pUSD: bigint }> => {
+  const state = await Rx.firstValueFrom(walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced)));
+
+  const tNight = state.unshielded.balances[unshieldedToken().raw] ?? 0n;
+  const coinPublicKeyHex = state.shielded.coinPublicKey.toHexString();
+  const pUSD = await getPUSDBalance(providers, contractAddress, coinPublicKeyHex);
+
+  return { tNight, pUSD };
+};
+
+/**
  * Read the calling user's PRIVATE position from the local LevelDB store.
  * This does NOT go to the network — it reads locally stored private state.
  */
@@ -438,8 +456,10 @@ export const transferPUSD = async (
 ): Promise<FinalizedTxData> => {
   if (amount <= 0n) throw new Error('Transfer amount must be positive');
   logger.info(`Transferring ${amount} pUSD to ${toPublicKeyHex}...`);
+  // Map hex string to the Compact struct expected for ZswapCoinPublicKey
+  const to = { bytes: Uint8Array.from(Buffer.from(toPublicKeyHex, 'hex')) };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  const txData = await (contract.callTx as any).transfer(toPublicKeyHex, amount);
+  const txData = await (contract.callTx as any).transfer(to, amount);
   logger.info(`transfer confirmed in block ${txData.public.blockHeight}`);
   return txData.public;
 };
@@ -453,8 +473,9 @@ export const approvePUSD = async (
   amount: bigint,
 ): Promise<FinalizedTxData> => {
   logger.info(`Approving ${spenderPublicKeyHex} to spend ${amount} pUSD...`);
+  const spender = { bytes: Uint8Array.from(Buffer.from(spenderPublicKeyHex, 'hex')) };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  const txData = await (contract.callTx as any).approve(spenderPublicKeyHex, amount);
+  const txData = await (contract.callTx as any).approve(spender, amount);
   logger.info(`approve confirmed in block ${txData.public.blockHeight}`);
   return txData.public;
 };
@@ -471,8 +492,10 @@ export const transferPUSDFrom = async (
 ): Promise<FinalizedTxData> => {
   if (amount <= 0n) throw new Error('Transfer amount must be positive');
   logger.info(`TransferFrom: ${fromPublicKeyHex} → ${toPublicKeyHex} for ${amount} pUSD...`);
+  const fromObj = { bytes: Uint8Array.from(Buffer.from(fromPublicKeyHex, 'hex')) };
+  const toObj = { bytes: Uint8Array.from(Buffer.from(toPublicKeyHex, 'hex')) };
   // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-  const txData = await (contract.callTx as any).transferFrom(fromPublicKeyHex, toPublicKeyHex, amount);
+  const txData = await (contract.callTx as any).transferFrom(fromObj, toObj, amount);
   logger.info(`transferFrom confirmed in block ${txData.public.blockHeight}`);
   return txData.public;
 };

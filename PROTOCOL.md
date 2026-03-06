@@ -44,9 +44,11 @@ User                     Lending Contract                    Midnight Ledger
  │                             │  (private: myCollateral -=)       │
 ```
 
-pUSD is a **synthetic internal token** tracked as a `Counter` in the public
-ledger (`totalDebt`). It has no on-chain ERC20 representation — it is purely
-an accounting entry in the contract's ledger state.
+pUSD is a **transferable synthetic stablecoin** implemented as an ERC-20-style 
+fungible token directly on the public ledger. It tracks `_balances`, `_allowances`, 
+and an immutable `_totalSupply`. Users can `transfer`, `approve`, and `transferFrom` 
+the pUSD token just like any typical cryptocurrency mapping, but seamlessly integrated 
+side-by-side with their Midnight ZK lending positions.
 
 ---
 
@@ -106,6 +108,10 @@ witness collateralAmount(): Uint<64>;
 witness debtAmount():       Uint<64>;
 ```
 
+On the other hand, the **pUSD Token** mechanics (`_balances`, `_allowances`) 
+are entirely public, mapping `ZswapCoinPublicKey` to balances. This ensures 
+pUSD mimics expected transparency of circulating fungible currency models.
+
 The TypeScript `witnesses` object (in `witnesses.ts`) supplies concrete values
 from the local DB. The Compact runtime generates a **ZK proof** that the
 circuit constraints hold (e.g. the ratio is ≥ 150%) without revealing the
@@ -132,9 +138,15 @@ but only the liquidator ever knows the exact values. This mirrors MakerDAO's
 
 ```compact
 export ledger totalCollateral: Counter;  // tNight held by protocol
-export ledger totalDebt:        Counter;  // pUSD minted in total
-export ledger liquidationRatio: Counter;  // 150 = 150%
-export ledger mintingRatio:     Counter;  // 150 = 150%
+export ledger totalDebt:       Counter;  // Total pUSD outstanding in lending positions
+export ledger liquidationRatio: Counter; // 150 = 150%
+export ledger mintingRatio:    Counter;  // 150 = 150%
+
+// Token standard fields
+export ledger _totalSupply:    Counter;
+export ledger _decimals:       Uint<8>;
+export ledger _balances:       Map<Bytes<32>, Uint<128>>;
+export ledger _allowances:     Map<AllowanceKey, Uint<128>>;
 ```
 
 ### Private State per User (`witnesses.ts`)
@@ -190,6 +202,7 @@ This explicitly marks the value as acceptable-to-reveal. Private values
 constructor() {
   liquidationRatio.increment(150 as Uint<16>);
   mintingRatio.increment(150 as Uint<16>);
+  _decimals = 18 as Uint<8>;
 }
 ```
 
@@ -238,6 +251,9 @@ export circuit mintPUSD(amount: Uint<64>): [] {
          "Insufficient collateral: ratio below minting threshold");
 
   totalDebt.increment(disclose(amount) as Uint<16>);
+  
+  // Mint fungible pUSD token to the caller's Zswap key
+  _mint(sender, amount as Uint<128>);
 }
 ```
 
@@ -256,6 +272,9 @@ export circuit repayPUSD(amount: Uint<64>): [] {
   assert(myDebt >= amount, "Cannot repay more than outstanding debt");
 
   totalDebt.decrement(disclose(amount) as Uint<16>);
+  
+  // Burn the token from caller's public token balance
+  _burn(sender, amount as Uint<128>);
 }
 ```
 
@@ -313,8 +332,17 @@ export circuit liquidate(victimCollateral: Uint<64>, victimDebt: Uint<64>): [] {
 
   totalCollateral.decrement(disclose(victimCollateral) as Uint<16>);
   totalDebt.decrement(disclose(victimDebt) as Uint<16>);
+  
+  // Liquidator must hold the pUSD required to close out the position
+  _burn(sender, victimDebt as Uint<128>);
 }
 ```
+
+---
+
+### Token Circuits (`transfer`, `approve`, `transferFrom`)
+
+These public circuits conform directly to OpenZeppelin standard `FungibleToken` logic ported to Compact structure. Because Compact currently (0.20/0.28) lacks local nested `Map` support, allowances utilize a flattened structure using an `AllowanceKey { owner: Bytes<32>, spender: Bytes<32> }`.
 
 ---
 
