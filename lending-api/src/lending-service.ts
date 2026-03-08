@@ -84,6 +84,7 @@ export interface WalletInfo {
     unshieldedBalance: string;
     dustBalance: string;
     isSynced: boolean;
+    coinPublicKey: string;
 }
 
 export interface TxResult {
@@ -284,15 +285,25 @@ export class LendingService {
 
         this.contractJoinPromise = (async () => {
             try {
+                // Preserve existing private state before rejoining — findDeployedContract
+                // will write initialPrivateState, which would reset our position.
+                const existingState = await this.providers!.privateStateProvider.get(LendingPrivateStateId);
+
                 const contract = await findDeployedContract(this.providers!, {
                     contractAddress: address,
                     compiledContract: lendingCompiledContract,
                     privateStateId: LendingPrivateStateId,
-                    initialPrivateState: initialLendingPrivateState,
+                    initialPrivateState: existingState ?? initialLendingPrivateState,
                 });
 
                 this.contract = contract;
                 this.contractAddress = contract.deployTxData.public.contractAddress;
+
+                // Restore private state if it was overwritten by findDeployedContract
+                if (existingState) {
+                    await this.providers!.privateStateProvider.set(LendingPrivateStateId, existingState);
+                }
+
                 return this.contractAddress;
             } finally {
                 this.contractJoinPromise = null;
@@ -437,33 +448,40 @@ export class LendingService {
 
     /**
      * Query the pUSD token balance (public ledger) for self or any address.
-     * Returns the raw Uint<128> value as a bigint.
+     * Reads directly from the public ledger _balances map.
+     * The key must be converted from hex to { bytes: Uint8Array } to match
+     * the ZswapCoinPublicKey struct expected by the Compact-generated Ledger.
      */
     async getPUSDBalance(publicKeyHex?: string): Promise<bigint> {
         this.requireProviders();
         if (!this.contractAddress) throw new Error('No contract deployed or joined');
 
+        // Resolve public key: caller's own key if not specified
+        const keyHex = publicKeyHex ?? (await this.getOwnCoinPublicKey());
+        if (!keyHex) return 0n;
+
         assertIsContractAddress(this.contractAddress);
         const contractState = await this.providers!.publicDataProvider.queryContractState(this.contractAddress);
         if (contractState == null) return 0n;
 
-        // Resolve public key: caller's own key if not specified
-        const keyHex = publicKeyHex ?? this.getOwnPublicKey();
-        if (!keyHex) return 0n;
-
-        const lstate = Lending.ledger(contractState.data) as any;
+        const lstate = Lending.ledger(contractState.data);
         try {
-            const balance = lstate._balances?.lookup?.(keyHex) ?? 0n;
-            return BigInt(balance as bigint);
+            // Convert hex string to the { bytes: Uint8Array } struct that _balances expects
+            const key = { bytes: Uint8Array.from(Buffer.from(keyHex, 'hex')) };
+            if (!lstate._balances.member(key)) return 0n;
+            return lstate._balances.lookup(key);
         } catch {
             return 0n;
         }
     }
 
-    /** Returns shielded coin public key hex of the current wallet, or null if not synced. */
-    private getOwnPublicKey(): string | null {
-        // This is a sync best-effort; for async use, call wallet.state() directly.
-        return null;
+    /** Returns shielded coin public key hex of the current wallet. */
+    async getOwnCoinPublicKey(): Promise<string | null> {
+        if (!this.walletCtx) return null;
+        const state = await Rx.firstValueFrom(
+            this.walletCtx.wallet.state().pipe(Rx.filter((s) => s.isSynced)),
+        );
+        return state.shielded.coinPublicKey.toHexString();
     }
 
     /**
@@ -473,6 +491,16 @@ export class LendingService {
     async transferPUSD(toPublicKeyHex: string, amount: bigint): Promise<TxResult> {
         this.requireContract();
         if (amount <= 0n) throw new Error('Transfer amount must be positive');
+
+        // Validate balance before submitting to avoid wasting dust and proof generation
+        const ownKey = await this.getOwnCoinPublicKey();
+        if (ownKey) {
+            const balance = await this.getPUSDBalance(ownKey);
+            if (balance < amount) {
+                throw new Error(`Insufficient pUSD balance: have ${balance}, need ${amount}`);
+            }
+        }
+
         const to = { bytes: Uint8Array.from(Buffer.from(toPublicKeyHex, 'hex')) };
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         const txData = await (this.contract!.callTx as any).transfer(to, amount);
@@ -613,21 +641,30 @@ export class LendingService {
             relayURL: new URL(this.config.node.replace(/^http/, 'ws')),
         };
     }
-
     private buildWalletInfo(state: any): WalletInfo {
         const networkId = getNetworkId();
+
         const unshieldedBalance = state.unshielded.balances[unshieldedToken().raw] ?? 0n;
         const dustBalance = state.dust.walletBalance(new Date());
 
-        const coinPubKey = ShieldedCoinPublicKey.fromHexString(state.shielded.coinPublicKey.toHexString());
-        const encPubKey = ShieldedEncryptionPublicKey.fromHexString(state.shielded.encryptionPublicKey.toHexString());
-        const shieldedAddress = MidnightBech32m.encode(networkId, new ShieldedAddress(coinPubKey, encPubKey)).toString();
+        const coinPublicKeyHex = state.shielded.coinPublicKey.toHexString();
+
+        const coinPubKey = ShieldedCoinPublicKey.fromHexString(coinPublicKeyHex);
+        const encPubKey = ShieldedEncryptionPublicKey.fromHexString(
+            state.shielded.encryptionPublicKey.toHexString()
+        );
+
+        const shieldedAddress = MidnightBech32m.encode(
+            networkId,
+            new ShieldedAddress(coinPubKey, encPubKey)
+        ).toString();
 
         return {
             seed: this.seed!,
             network: String(networkId),
             unshieldedAddress: this.walletCtx!.unshieldedKeystore.getBech32Address().toString(),
             shieldedAddress,
+            coinPublicKey: coinPublicKeyHex,   // <-- ADD THIS
             dustAddress: state.dust.dustAddress?.toString() ?? '',
             unshieldedBalance: unshieldedBalance.toString(),
             dustBalance: dustBalance.toString(),

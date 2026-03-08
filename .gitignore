@@ -13,7 +13,7 @@ yarn-error.log*
 logs
 *.log
 logs/*.log
-midnight-level-db
+midnight-level-db*
 coverage
 
 # Test reports

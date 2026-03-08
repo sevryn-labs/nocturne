@@ -8,6 +8,14 @@ A **privacy-preserving collateralised lending protocol** built on the [Midnight 
 
 ---
 
+## Recent Updates (v2)
+- ✅ **pUSD Transfers:** Full peer-to-peer synthetic token transfers using the recipient's Coin Public Key.
+- ✅ **Multi-Wallet Support:** Run multiple wallets concurrently on the same machine without LevelDB encryption conflicts.
+- ✅ **Token Balances:** On-chain pUSD and shielded wallet token balance fetching.
+- ✅ **Session Recovery:** Better API resilience for frontend connection recovery.
+
+---
+
 ## Table of Contents
 
 - [How It Works](#how-it-works)
@@ -386,12 +394,16 @@ After receiving tNight, the CLI registers your NIGHT UTXOs for DUST generation. 
   [1] Deploy a new pUSD Lending contract
   [2] Join an existing pUSD Lending contract
   [3] Monitor DUST balance
-  [4] Exit
+  [4] View Coin Public Key (for receiving pUSD)
+  [5] Exit
 ```
 
 - **[1] Deploy** — creates a new lending protocol on-chain. Save the contract address shown on success.
 - **[2] Join** — enter a contract address to interact with an existing deployment.
 - **[3] Monitor** — live-stream your DUST balance (useful while waiting for generation).
+- **[4] View Coin Public Key** — display your ZSwap shielded public key.
+
+> **Tip:** You can run multiple CLI tabs with different seeds to simulate multi-user behavior. The LevelDB state is isolated per wallet, preventing any cross-wallet AES encryption conflicts.
 
 ### Step 5: Lend and borrow
 
@@ -405,7 +417,10 @@ After receiving tNight, the CLI registers your NIGHT UTXOs for DUST generation. 
   [5] Liquidate            (claim undercollateralised position)
   [6] View Protocol State  (public totals)
   [7] View My Position     (private balance)
-  [8] Exit
+  [8] View Wallet Balances (tNight & pUSD)
+  [9] View Coin Public Key (for receiving pUSD)
+  [10] Transfer pUSD       (send tokens to another coin public key)
+  [11] Exit
 ```
 
 **Example flow:**
@@ -511,6 +526,7 @@ The REST API server (`lending-api/`) exposes the following endpoints on **http:/
 | `POST` | `/api/actions/repay` | `{ amount: string }` | Repay pUSD debt |
 | `POST` | `/api/actions/withdraw` | `{ amount: string }` | Withdraw tNight |
 | `POST` | `/api/actions/liquidate` | `{ victimCollateral, victimDebt }` | Liquidate undercollateralised position |
+| `POST` | `/api/actions/transfer` | `{ recipientPublicKey, amount }` | Transfer pUSD to another wallet |
 
 All responses use JSON. BigInt values are serialized as strings. Errors include an `errorType` field for frontend categorization.
 

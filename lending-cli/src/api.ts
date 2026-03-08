@@ -51,12 +51,12 @@ import {
   type DeployedLendingContract,
   type ProtocolState,
   type UserPosition,
-} from './common-types.js';
-import { type Config, contractConfig } from './config.js';
+} from './common-types';
+import { type Config, contractConfig } from './config';
 import { levelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
 import { assertIsContractAddress, toHex } from '@midnight-ntwrk/midnight-js-utils';
 import { getNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
-import { CompiledContract } from '@midnight-ntwrk/compact-js';
+import { CompiledContract, ContractExecutable } from '@midnight-ntwrk/compact-js';
 import { Buffer } from 'buffer';
 import {
   MidnightBech32m,
@@ -149,10 +149,12 @@ export const getPUSDBalance = async (
 
   const lstate = Lending.ledger(contractState.data) as any;
   // _balances is a Map<ZswapCoinPublicKey, Uint<128>>
-  // We look up by the hex public key string.
-  // Cast to any: types update after `npm run compact`.
+  // ZswapCoinPublicKey is a struct { bytes: Bytes<32> } — pass the struct, not a hex string.
+  // Keep `as any` on Lending.ledger() to avoid authentication errors on stale managed types.
   try {
-    const balance = lstate._balances?.lookup?.(publicKeyHex) ?? 0n;
+    const key = { bytes: Uint8Array.from(Buffer.from(publicKeyHex, 'hex')) };
+    if (!lstate._balances?.member?.(key)) return 0n;
+    const balance = lstate._balances.lookup(key) ?? 0n;
     return BigInt(balance as bigint);
   } catch {
     return 0n;
@@ -805,8 +807,15 @@ export const buildFreshWallet = async (config: Config): Promise<WalletContext> =
 export const configureProviders = async (ctx: WalletContext, config: Config): Promise<LendingProviders> => {
   const walletAndMidnightProvider = await createWalletAndMidnightProvider(ctx);
   const zkConfigProvider = new NodeZkConfigProvider<LendingCircuits>(contractConfig.zkConfigPath);
+
+  const walletState = await Rx.firstValueFrom(ctx.wallet.state().pipe(Rx.filter((s) => s.isSynced)));
+  const coinKeyPrefix = walletState.shielded.coinPublicKey.toHexString().slice(0, 16);
+  const dbName = `midnight-level-db-${coinKeyPrefix}`;
+
   return {
     privateStateProvider: levelPrivateStateProvider<LendingPrivateStateId>({
+      // @ts-ignore - midnightDbName is available but might not be in the typings
+      midnightDbName: dbName,
       privateStateStoreName: contractConfig.privateStateStoreName,
       walletProvider: walletAndMidnightProvider,
     }),

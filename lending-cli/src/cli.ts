@@ -17,8 +17,6 @@ import { type StartedDockerComposeEnvironment, type DockerComposeEnvironment } f
 import { type LendingProviders, type DeployedLendingContract } from './common-types.js';
 import { type Config, StandaloneConfig } from './config.js';
 import * as api from './api.js';
-import { MidnightBech32m, UnshieldedAddress } from '@midnight-ntwrk/wallet-sdk-address-format';
-import { getNetworkId } from '@midnight-ntwrk/midnight-js-network-id';
 
 let logger: Logger;
 
@@ -64,7 +62,8 @@ ${DIVIDER}
   [1] Deploy a new pUSD Lending contract
   [2] Join an existing pUSD Lending contract
   [3] Monitor DUST balance
-  [4] Exit
+  [4] View Coin Public Key (for receiving pUSD)
+  [5] Exit
 ${'─'.repeat(66)}
 > `;
 
@@ -80,8 +79,9 @@ ${DIVIDER}
   [6] View Protocol State  (public totals)
   [7] View My Position     (private balance)
   [8] View Wallet Balances (tNight & pUSD)
-  [9] Transfer pUSD        (send tokens to another unshielded address)
-  [10] Exit
+  [9] View Coin Public Key (for receiving pUSD)
+  [10] Transfer pUSD       (send tokens to another coin public key)
+  [11] Exit
 ${'─'.repeat(66)}
 > `;
 
@@ -273,7 +273,19 @@ const deployOrJoin = async (
         await startDustMonitor(walletCtx.wallet, rli);
         break;
 
-      case '4':
+      case '4': {
+        try {
+          const state = await api.waitForSync(walletCtx.wallet);
+          const coinPubKey = state.shielded.coinPublicKey.toHexString();
+          console.log(`\n${DIVIDER}\n  Coin Public Key (ZswapCoinPublicKey)\n${DIVIDER}\n  ${coinPubKey}\n${DIVIDER}`);
+          console.log('  Share this key so others can transfer pUSD to you.\n');
+        } catch (e) {
+          console.log(`  ✗ Could not read coin public key: ${e instanceof Error ? e.message : String(e)}\n`);
+        }
+        break;
+      }
+
+      case '5':
         return null;
 
       default:
@@ -323,7 +335,14 @@ const lendingLoop = async (
           const tx = await api.withStatus(`Minting ${amount.toLocaleString()} pUSD`, () =>
             api.mintPUSD(lendingContract, providers, amount),
           );
-          console.log(`  ✓ Minted — tx ${tx.txId} in block ${tx.blockHeight}\n`);
+          console.log(`  ✓ Minted — tx ${tx.txId} in block ${tx.blockHeight}`);
+          // Show updated pUSD balance for verification
+          try {
+            const balances = await api.getWalletBalances(providers, walletCtx, contractAddress as any);
+            console.log(`  New pUSD balance: ${balances.pUSD.toLocaleString()}\n`);
+          } catch {
+            console.log('\n');
+          }
           await displayPosition(providers, contractAddress);
         } catch (e) {
           showError('Mint', e);
@@ -418,20 +437,25 @@ const lendingLoop = async (
         await displayWalletBalances(providers, walletCtx, contractAddress);
         break;
 
-      // ── [9] Transfer pUSD ────────────────────────────────────────────────
+      // ── [9] View Coin Public Key ─────────────────────────────────────────
       case '9': {
-        const address = await rli.question('  Enter destination unshielded address (mn_addr_...): ');
-        if (!address.trim()) break;
-
-        let toPublicKeyHex: string;
         try {
-          const bech32Address = MidnightBech32m.parse(address.trim());
-          const unshielded = UnshieldedAddress.codec.decode(getNetworkId(), bech32Address);
-          toPublicKeyHex = unshielded.data.toString('hex');
+          const state = await api.waitForSync(walletCtx.wallet);
+          const coinPubKey = state.shielded.coinPublicKey.toHexString();
+          console.log(`\n${DIVIDER}\n  Coin Public Key (ZswapCoinPublicKey)\n${DIVIDER}\n  ${coinPubKey}\n${DIVIDER}`);
+          console.log('  Share this key so others can transfer pUSD to you.\n');
         } catch (e) {
-          console.log('  ✗ Invalid unshielded address format\n');
-          break;
+          console.log(`  ✗ Could not read coin public key: ${e instanceof Error ? e.message : String(e)}\n`);
         }
+        break;
+      }
+
+      // ── [10] Transfer pUSD ───────────────────────────────────────────────
+      case '10': {
+        const toKey = await rli.question('  Enter recipient coin public key (hex): ');
+        if (!toKey.trim()) break;
+
+        const toPublicKeyHex = toKey.trim();
 
         const amount = await promptAmount(rli, 'pUSD to transfer');
         if (!amount) break;
@@ -441,15 +465,15 @@ const lendingLoop = async (
             api.transferPUSD(lendingContract, toPublicKeyHex, amount),
           );
           console.log(`  ✓ Transferred — tx ${tx.txId} in block ${tx.blockHeight}\n`);
-          await displayPosition(providers, contractAddress);
+          await displayWalletBalances(providers, walletCtx, contractAddress);
         } catch (e) {
           showError('Transfer', e);
         }
         break;
       }
 
-      // ── [10] Exit ────────────────────────────────────────────────────────
-      case '10':
+      // ── [11] Exit ────────────────────────────────────────────────────────
+      case '11':
         return;
 
       default:

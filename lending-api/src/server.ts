@@ -57,6 +57,7 @@ const asyncHandler = (fn: (req: express.Request, res: express.Response) => Promi
             else if (message.includes('Withdrawal amount must be positive')) errorType = 'VALIDATION';
             else if (message.includes('Cannot repay')) errorType = 'INSUFFICIENT_BALANCE';
             else if (message.includes('Cannot withdraw')) errorType = 'INSUFFICIENT_BALANCE';
+            else if (message.includes('Insufficient pUSD')) errorType = 'INSUFFICIENT_BALANCE';
             else if (message.includes('not liquidatable')) errorType = 'NOT_LIQUIDATABLE';
             else if (message.includes('Insufficient collateral')) errorType = 'COLLATERAL_RATIO';
             else if (message.includes('breach liquidation')) errorType = 'COLLATERAL_RATIO';
@@ -161,7 +162,15 @@ app.post('/api/actions/mint', asyncHandler(async (req, res) => {
         return;
     }
     const result = await service.mint(BigInt(amount));
-    sendJson(res, result);
+    // Include updated pUSD balance for mint verification UX
+    let newBalance: string | undefined;
+    try {
+        const bal = await service.getPUSDBalance();
+        newBalance = bal.toString();
+    } catch {
+        // Non-critical; balance fetch may fail but mint succeeded
+    }
+    sendJson(res, { ...result, newPUSDBalance: newBalance });
 }));
 
 app.post('/api/actions/repay', asyncHandler(async (req, res) => {
@@ -253,7 +262,7 @@ app.listen(PORT, () => {
     console.log(`  POST /api/actions/withdraw`);
     console.log(`  POST /api/actions/liquidate`);
     console.log(`  --- pUSD Token ---`);
-    console.log(`  GET  /api/token/balance?publicKey=<hex>`);
+    console.log(`  GET  /api/token/balance[?publicKey=<hex>]`);
     console.log(`  POST /api/token/transfer`);
     console.log(`  POST /api/token/approve`);
     console.log(`  POST /api/token/transfer-from`);
