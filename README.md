@@ -659,10 +659,20 @@ MIDNIGHT_NETWORK=standalone PORT=4000 npm run dev:api
 
 ---
 
+## Roadmap
+
+To evolve from an MVP into a fully production-ready decentralized stablecoin protocol, the following mechanics will be implemented in future iterations:
+
+- **Decentralized Price Oracles:** Currently the protocol assumes a 1:1 price parity for simplicity. Future versions will integrate with external oracle networks to feed real-time pricing data for the collateral asset, enabling borrowing against volatile assets.
+- **Liquidation Incentives:** The current liquidator merely re-balances the public counters. The next iteration will implement a liquidation penalty fee (e.g. 10%) rewarded directly to the liquidator out of the seized collateral to properly incentivize external keeper networks.
+- **Keeper Network Integration:** We will publish a reference "Keeper Bot" implementation that constantly monitors the `totalCollateral`/`totalDebt` public states across all positions and automatically initiates the `liquidate` circuit when a position falls below the collateralization ratio.
+- **Stablecoin Peg Stability:** Implement a Stability Fee (interest rate) that can be adjusted via protocol governance to expand/contract the circulating pUSD supply, dynamically maintaining the $1 peg.
+
+---
+
 ## Further Reading
 
 - **[PROTOCOL.md](PROTOCOL.md)** — Complete protocol documentation: economic model, privacy design, circuit descriptions, ratio math, and liquidation mechanics
-- **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** — Detailed guide for migrating from midnight-js 2.x to 3.0.0 (wallet SDK, docker images, contract patterns)
 - [Preprod Faucet](https://faucet.preprod.midnight.network) — Get testnet tNight tokens
 - [Midnight Documentation](https://docs.midnight.network/) — Developer guide
 - [Compact Language Reference](https://docs.midnight.network/compact) — Smart contract language

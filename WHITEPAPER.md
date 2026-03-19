@@ -1,6 +1,6 @@
 # pUSD: A Privacy-Preserving Collateralized Lending Protocol on Midnight
 
-**Version:** 2.0.0  
+**Version:** 2.1.0  
 **Date:** March 2026  
 **Authors:** Midnight Network Protocol Engineers  
 
@@ -90,8 +90,8 @@ The pUSD protocol is implemented across a vertically integrated stack tailored f
 1. **Midnight Network Layer:** Provides base consensus, the unshielded token ledger (for tNight), and shielding capabilities.
 2. **Proof Server:** A local or remote cryptographic proving service. It downloads verification keys and compiles the ZK Intermediate Representation (ZKIR) to construct valid zero-knowledge proofs over the user's private data.
 3. **Compact Smart Contract:** The core protocol logic. Written in Compact, the contract defines the public ledger schema, the expected private witnesses, and the rigid mathematical constraints (circuits) that valid transactions must satisfy.
-4. **Wallet SDK / API Layer:** A TypeScript orchestration layer managing UTXOs, wallet state synchronization, levelDB private state persistence, and transaction intent signing.
-5. **User Interface:** A web application interacting with the API layer, rendering public network state and private position health without compromising the underlying cryptographic isolation.
+4. **Backend Services & API Layer:** A TypeScript orchestration layer wrapping the wallet SDK. It natively manages UTXOs, node synchronization, and local multi-wallet isolated LevelDB persistence preventing private key encryption conflicts. A REST API server dynamically bridges the ZK environment to broader clients.
+5. **User Interfaces:** A unified interactive terminal CLI and a React web application front-end interacting with the REST API layer, rendering public network state and private position health seamlessly without compromising the underlying cryptographic isolation.
 
 ---
 
@@ -154,7 +154,7 @@ $$ \Sigma \text{Balances} = \text{TotalSupply} = \text{TotalDebt} $$
 
 ### 6.3 Transfer Mechanisms
 
-Users and smart contracts can transfer pUSD unconditionally via the `transfer` and `transferFrom` circuits. These operations mutate `_balances` and `_allowances` but have strictly zero effect on `totalDebt` or `totalCollateral`. Transferring pUSD does not transfer the underlying debt obligation; the original borrower remains strictly liable for repaying the pUSD they minted to recover their locked collateral.
+Users and smart contracts can transfer pUSD unconditionally via the `transfer` and `transferFrom` circuits. In the current v2 architecture, users are dynamically capable of peer-to-peer (P2P) transfers of synthetic pUSD strictly using the recipient's Zswap Coin Public Key directly via the API or CLI interfaces. These operations uniquely mutate `_balances` and `_allowances` but have strictly zero effect on `totalDebt` or `totalCollateral`. Transferring pUSD does not transfer the underlying debt obligation; the original borrower remains strictly liable for repaying the pUSD they originally minted to recover their locked collateral.
 
 ---
 
@@ -193,12 +193,11 @@ If $D_{current} = 0$, the right hand evaluates identically to zero, meaning any 
 
 In the event that collateral values depreciate relative to the outstanding synthetic debt, the protocol must rapidly recapitalize to protect the peg.
 
-### 8.1 The Liquidation Trigger
+### 8.1 The Keeper Model
 
-Due to the private nature of the positions, the network itself cannot autonomously flag users for liquidation. The mathematical threshold exists:
-$$ C_{victim} \times 100 < D_{victim} \times 150 $$
+Because Midnight circuits cannot self-execute or independently monitor global parameters autonomously, the protocol structurally relies on an external **Keeper Model** for system liquidations. Keepers operate off-chain bots that monitor the `totalCollateral` vs `totalDebt` ledgers bounds, identifying highly leveraged parameters.
 
-A liquidator, possessing external or leaked insight into a distressed position, executes the `liquidate` circuit by passing in the victim's precise collateral and debt bounds. 
+Due to the private nature of the local positions, the network itself cannot autonomously flag an individual user algorithmically. A liquidator executing the Keeper network must aggressively probe distressed positions by executing the `liquidate` circuit by passing in inferred or assumed values for the victim's precise collateral and debt bounds. If the parameters pass the assertion threshold accurately ($C_{victim} \times 100 < D_{victim} \times 150$), the liquidation succeeds organically.
 
 ### 8.2 Execution and Asset Seizure
 
@@ -280,19 +279,19 @@ Users compile their execution paths exclusively via the isolated proving node. M
 The protocol, while achieving the cornerstone objective of zero-knowledge collateralized lending, exhibits specific intentional bounds:
 
 1. **Single Collateral Asset:** The infrastructure structurally maps only a single internal `totalCollateral` ledger, implying backing is solely dedicated to tNight mechanics. 
-2. **Oracle Absence:** Absolute mathematical parameters dictate the stablecoin is bound strictly 1:1 locally in relative unit precision. It lacks an external pricing oracle, meaning the stablecoin maintains synthetics relative strictly to the inherent internal ratio, preventing dynamic peg shifting relative to disparate external USD pairs.
-3. **Static Interest Rates:** The protocol mandates a $0\%$ interest rate structure, bypassing the extreme complexities of accumulating private fractional interests within SNARK circuit loops over extensive time blocks continuously. 
+2. **Oracle Absence:** Absolute mathematical parameters dictate the stablecoin is bound strictly 1:1 locally in relative unit precision. It lacks an external decentralized pricing oracle, meaning the stablecoin maintains synthetics strictly relative to an automated 1:1 internal ratio, preventing borrowing against variable real-world off-chain assets in this MVP.
+3. **Static Interest Rates & Peg Management:** The protocol currently mandates a $0\%$ interest rate structure, bypassing robust dynamic peg-maintenance requirements (like adjusting Stability Fees).
 4. **Governance Absence:** The crucial parameters of `150%` liquidation and minting ratios are immutably sealed during constructor initialization, providing robust mathematical predictability but eliminating responsive agile monetary policy responses.
 
 ---
 
 ## 13. Future Work
 
-The implementation of pUSD paves the way for extensive future developments in shielded decentralized finance. Obvious extensions include:
+The v2 implementation of pUSD paves the robust foundational way for extensive future developments in shielded decentralized finance mechanics. Obvious extensions mirroring the Protocol Roadmap include:
 
-- **Dynamical Multi-Collateral Tracking:** Broadening the contract out to utilize variable mappings for differing supported assets, enabling complex heterogeneous borrowing positions.
-- **Oracle Integration Layers:** Utilizing zero-knowledge bridged price feeds (via trusted execution environments or decentralized oracles) to adjust the synthetic target values automatically.
-- **Protocol Treasuries & Stability Fees:** Implementing internal mechanism constraints to slowly funnel a fraction of repaid pUSD tokens into a managed `protocolReserve`, establishing organic yield logic for independent network liquidity providers.
+- **Decentralized Price Oracles:** Utilizing zero-knowledge bridged price feeds to route real-time pricing data for volatile network collateral (e.g. via trusted execution environments or oracle webs) enabling real-world stability shifting.
+- **Keeper Overhauls & Liquidation Incentives:** Instead of merely wiping the accounting ledgers cleanly, future mainnet iterations will establish tangibly profitable Liquidation Penalties (e.g., 10%) rewarded directly back to the active Liquidator's cryptographic key directly out of the seized underlying collateral pool to financially reinforce off-chain tracking ecosystems.
+- **Stablecoin Peg Stability:** Implement a Stability Fee (interest rate mechanism) structurally adjustable dynamically via protocol governance. Actively expanding and contracting the borrowing cost mechanism will dynamically enforce a $1 USD soft-peg through native arbitrage loops.
 - **Zero-Knowledge Flash Loans:** Expanding the atomic composability of Midnight's execution context to support flash-borrowing of pUSD, relying intrinsically on the ultimate state-reversion SNARK proof protections.
 
 ---

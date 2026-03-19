@@ -16,9 +16,11 @@
 6. [Collateral Ratio Math](#6-collateral-ratio-math)
 7. [Liquidation Mechanics](#7-liquidation-mechanics)
 8. [End-to-End Flow: Deposit → Mint → Repay → Withdraw](#8-end-to-end-flow)
-9. [Security Properties](#9-security-properties)
-10. [Repository Structure](#10-repository-structure)
-11. [Getting Started](#11-getting-started)
+9. [Protocol Invariants & Limits](#9-protocol-invariants--limits)
+10. [Security Properties](#10-security-properties)
+11. [Roadmap](#11-roadmap)
+12. [Repository Structure](#12-repository-structure)
+13. [Getting Started](#13-getting-started)
 
 ---
 
@@ -444,7 +446,31 @@ All steps complete. Protocol returns to empty state. ✓
 
 ---
 
-## 9. Security Properties
+## 9. Protocol Invariants & Limits
+
+### Core Invariants
+
+The protocol guarantees the following global invariants across all state transitions:
+
+1. **Supply Parity:** `totalDebt == _totalSupply`. The outstanding pUSD debt recorded across all individual borrowers exactly equals the total circulating supply of the ERC-20-style `_balances` ledger.
+2. **Solvency Parity:** `totalCollateral >= (totalDebt * 150) / 100` is logically enforced for individual positions upon creation (`mintPUSD`) and withdrawal (`withdrawCollateral`).
+3. **Double-Spend Prevention:** Users cannot extract more collateral than they deposited (`assert(myCollateral >= amount)`). All token balances and debt ledgers are non-negative.
+
+### External Keeper Model
+
+Because Midnight circuits cannot self-execute or monitor global state automatically, the protocol relies on an external **Keeper Model** for liquidations:
+- Keepers run off-chain bots that monitor `totalCollateral` vs `totalDebt`, or watch specific on-chain lending actions.
+- When they identify heavily leveraged positions (e.g. they see large mints or price drops), they can probe those public keys via the `liquidate` circuit. 
+- If the assertion `victimCollateral * 100 < victimDebt * ratio` genuinely passes, the ZK proof is validated by the network, and the keeper successfully executes the liquidation.
+
+### System Limits
+
+- **Data Types:** All monetary ledgers use `Uint<128>` to comfortably hold `18` decimal precisions without overflow risk during basic additions.
+- **Arithmetic:** Ratio checks operate up to `Uint<64>` prior to multiplications to guarantee no integer overflow occurs when calculating `* 100` or `* 150` internal logic checks.
+
+---
+
+## 10. Security Properties
 
 | Property                        | Enforced by                                     |
 |---------------------------------|-------------------------------------------------|
@@ -460,7 +486,17 @@ All steps complete. Protocol returns to empty state. ✓
 
 ---
 
-## 10. Repository Structure
+## 11. Roadmap
+
+To evolve from an MVP into a fully production-ready decentralized stablecoin protocol, the following mechanisms will be implemented in future mainnet iterations:
+
+- **Decentralized Price Oracles:** Currently the protocol assumes a 1:1 price parity for simplicity. Future versions will integrate with oracle networks to feed real-time pricing data for the collateral asset to the contract state, enabling borrowing against volatile real-world assets.
+- **Liquidation Incentives:** The current liquidator merely re-balances the public counters upon successful proof verification. The next iteration will implement a tangible liquidation penalty fee (e.g., 10-15%) rewarded directly to the liquidator's public ZSwap address out of the seized collateral to properly incentivize external Keeper networks.
+- **Stablecoin Peg Stability:** A robust dynamic Stability Fee (interest rate) mechanism will be required. Adjustable via protocol governance, manipulating the borrowing cost expands/contracts the circulating pUSD supply, dynamically maintaining the $1 (USD) soft-peg through arbitrage.
+
+---
+
+## 12. Repository Structure
 
 ```
 lending_protocol/
@@ -474,7 +510,17 @@ lending_protocol/
 │   │   │   └── lending/contract/    #   index.js, keys, zkir
 │   │   └── test/
 │   │       ├── lending-simulator.ts # In-memory test harness
-│   │       └── lending.test.ts      # Unit tests (vitest, 30 tests)
+│   │       └── lending.test.ts      # Unit tests (vitest, 48 tests)
+│
+├── lending-api/                     # REST API server
+│   ├── src/
+│   │   ├── server.ts                # Express server
+│   │   └── lending-service.ts       # Core logic wrapper
+│
+├── lending-ui/                      # React web frontend
+│   ├── src/
+│   │   ├── main.tsx                 # Web entry point
+│   │   └── pages/                   # UI views
 │
 └── lending-cli/
     ├── package.json                 # @midnight-ntwrk/lending-cli
@@ -495,7 +541,7 @@ lending_protocol/
 
 ---
 
-## 11. Getting Started
+## 13. Getting Started
 
 ### Prerequisites
 
@@ -521,6 +567,21 @@ cd contract && npm test
 
 Tests run against the in-memory `LendingSimulator` — no Midnight node needed.
 
+### Run Web UI + API (Recommended)
+
+```bash
+# 1. Start the proof server
+cd lending-cli && docker compose -f proof-server.yml up -d
+
+# 2. Start the REST API (in a new terminal)
+npm run dev:api
+
+# 3. Start the Web UI (in a new terminal)
+npm run dev:ui
+```
+
+Open `http://localhost:5173` to interact with the protocol via the web application.
+
 ### Run CLI (Preprod Testnet)
 
 ```bash
@@ -544,6 +605,7 @@ The CLI will guide you through:
 3. Dust token registration (for network fees)
 4. Contract deployment or joining
 5. Full lending operations (deposit, mint, repay, withdraw, liquidate, view)
+6. Peer-to-peer pUSD transfers (`[10] Transfer pUSD`)
 
 ### Run CLI (Standalone / Local Node)
 
