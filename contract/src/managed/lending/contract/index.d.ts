@@ -6,8 +6,6 @@ export type Witnesses<PS> = {
 }
 
 export type ImpureCircuits<PS> = {
-  decimals(context: __compactRuntime.CircuitContext<PS>): __compactRuntime.CircuitResults<PS, bigint>;
-  totalSupply(context: __compactRuntime.CircuitContext<PS>): __compactRuntime.CircuitResults<PS, bigint>;
   balanceOf(context: __compactRuntime.CircuitContext<PS>,
             account_0: { bytes: Uint8Array }): __compactRuntime.CircuitResults<PS, bigint>;
   allowance(context: __compactRuntime.CircuitContext<PS>,
@@ -38,8 +36,6 @@ export type PureCircuits = {
 }
 
 export type Circuits<PS> = {
-  decimals(context: __compactRuntime.CircuitContext<PS>): __compactRuntime.CircuitResults<PS, bigint>;
-  totalSupply(context: __compactRuntime.CircuitContext<PS>): __compactRuntime.CircuitResults<PS, bigint>;
   balanceOf(context: __compactRuntime.CircuitContext<PS>,
             account_0: { bytes: Uint8Array }): __compactRuntime.CircuitResults<PS, bigint>;
   allowance(context: __compactRuntime.CircuitContext<PS>,
@@ -69,8 +65,16 @@ export type Circuits<PS> = {
 export type Ledger = {
   readonly totalCollateral: bigint;
   readonly totalDebt: bigint;
+  readonly insuranceFund: bigint;
   readonly liquidationRatio: bigint;
   readonly mintingRatio: bigint;
+  readonly oraclePrice: bigint;
+  readonly oracleTimestamp: bigint;
+  readonly oracleStalenessLimit: bigint;
+  readonly debtCeiling: bigint;
+  readonly liquidationPenalty: bigint;
+  readonly minDebt: bigint;
+  readonly paused: bigint;
   _balances: {
     isEmpty(): boolean;
     size(): bigint;

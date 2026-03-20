@@ -34,9 +34,10 @@ const BANNER = `
 ║    ██╔═══╝ ██║   ██║╚════██║██║  ██║                             ║
 ║    ██║     ╚██████╔╝███████║██████╔╝                             ║
 ║                                                                  ║
-║    pUSD Privacy-Preserving Lending Protocol                      ║
-║    ─────────────────────────────────────                         ║
+║    pUSD Privacy-Preserving Lending Protocol  v3                  ║
+║    ─────────────────────────────────────────                     ║
 ║    Built on Midnight Network · Powered by ZK Proofs              ║
+║    Oracle-driven · Debt ceiling · Min debt enforcement            ║
 ║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝
 `;
@@ -128,18 +129,33 @@ const displayPosition = async (providers: LendingProviders, contractAddress: str
   console.log('');
   try {
     const pos = await api.getPosition(providers, contractAddress as any);
+    // Fetch oracle price for display
+    let oraclePriceLabel = '$1.00';
+    try {
+      const st = await api.getProtocolState(providers, contractAddress as any);
+      if (st) {
+        const priceNum = Number(st.oraclePrice) / 10000;
+        oraclePriceLabel = `$${priceNum.toFixed(2)}`;
+      }
+    } catch { /* use default */ }
+
+    const ratioLabel = pos.debtAmount > 0n
+      ? `${pos.collateralRatio}% (oracle-adjusted)`
+      : 'N/A (no debt)';
+
+    const healthLabel = pos.debtAmount === 0n
+      ? '✓ No debt'
+      : pos.isLiquidatable
+        ? '⚠ LIQUIDATABLE (ratio < 150%)'
+        : `✓ Healthy (ratio ≥ 150%)`;
+
     console.log(`${DIVIDER}
-  My Private Position
+  My Private Position                   Oracle: ${oraclePriceLabel}
 ${DIVIDER}
   Collateral (tNight) : ${pos.collateralAmount.toLocaleString()}
   Debt (pUSD)         : ${pos.debtAmount.toLocaleString()}
-  Collateral Ratio    : ${pos.debtAmount > 0n ? `${pos.collateralRatio}%` : 'N/A (no debt)'}
-  Health              : ${pos.debtAmount === 0n
-        ? '✓ No debt'
-        : pos.isLiquidatable
-          ? '⚠ LIQUIDATABLE (ratio < 150%)'
-          : `✓ Healthy (ratio ≥ 150%)`
-      }
+  Collateral Ratio    : ${ratioLabel}
+  Health              : ${healthLabel}
 ${DIVIDER}`);
   } catch (e) {
     console.log(`  ✗ Could not read position: ${e instanceof Error ? e.message : String(e)}\n`);
@@ -173,13 +189,31 @@ const displayProtocolState = async (providers: LendingProviders, contractAddress
       console.log('  ✗ Contract not found on chain\n');
       return;
     }
+
+    const priceNum = Number(state.oraclePrice) / 10000;
+    const pauseLabel = state.paused === 0n ? '✓ Active' : '⛔ PAUSED';
+    const ceilingUsed = state.totalDebt > 0n
+      ? `${((Number(state.totalDebt) / Number(state.debtCeiling)) * 100).toFixed(1)}%`
+      : '0%';
+
     console.log(`${DIVIDER}
-  Public Protocol State
+  Public Protocol State (v3)
 ${DIVIDER}
   Total Collateral (tNight) : ${state.totalCollateral.toLocaleString()}
   Total pUSD Debt           : ${state.totalDebt.toLocaleString()}
+  pUSD Total Supply         : ${state.totalSupply.toLocaleString()}
   Liquidation Ratio         : ${state.liquidationRatio}%
   Minting Ratio             : ${state.mintingRatio}%
+${DIVIDER}
+  Oracle Price              : $${priceNum.toFixed(4)} (raw: ${state.oraclePrice})
+  Oracle Last Update        : block ${state.oracleTimestamp}
+  Staleness Limit           : ${state.oracleStalenessLimit} blocks
+${DIVIDER}
+  Debt Ceiling              : ${state.debtCeiling.toLocaleString()} pUSD (${ceilingUsed} used)
+  Min Vault Debt            : ${state.minDebt.toLocaleString()} pUSD
+  Liquidation Penalty       : ${(Number(state.liquidationPenalty) / 100).toFixed(1)}% (${state.liquidationPenalty} bps)
+  Insurance Fund            : ${state.insuranceFund.toLocaleString()}
+  Status                    : ${pauseLabel}
 ${DIVIDER}`);
   } catch (e) {
     console.log(`  ✗ Could not read protocol state: ${e instanceof Error ? e.message : String(e)}\n`);
@@ -396,9 +430,16 @@ const lendingLoop = async (
         const victimDebt = await promptAmount(rli, "victim's debt (pUSD)");
         if (!victimDebt) break;
 
-        const ratio = (victimCollateral * 100n) / victimDebt;
-        if (ratio >= 150n) {
-          console.log(`  ✗ Position ratio is ${ratio}% — NOT liquidatable (must be < 150%)\n`);
+        // Use oracle price for pre-check
+        let oraclePrice = 10000n;
+        try {
+          const st = await api.getProtocolState(providers, contractAddress as any);
+          if (st) oraclePrice = st.oraclePrice;
+        } catch { /* default */ }
+        const ratio = (victimCollateral * oraclePrice * 100n) / (victimDebt * 10000n);
+        const liqRatio = 150n; // default
+        if (ratio >= liqRatio) {
+          console.log(`  ✗ Position ratio is ${ratio}% at oracle price — NOT liquidatable (must be < ${liqRatio}%)\n`);
           break;
         }
 

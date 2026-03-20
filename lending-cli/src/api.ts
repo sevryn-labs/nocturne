@@ -111,10 +111,6 @@ export const getProtocolState = async (
   }
 
   const lstate = Lending.ledger(contractState.data) as any;
-  // _totalSupply is the pUSD token total supply — always equals totalDebt
-  // NOTE: lstate is cast to `any` because the managed types are stale until
-  // `npm run compact` is re-run.  After recompile, the type will include
-  // _totalSupply, _balances, _allowances, _name, _symbol, _decimals.
   const totalSupply: bigint = (lstate._totalSupply as bigint | undefined) ?? 0n;
   const state: ProtocolState = {
     totalCollateral: lstate.totalCollateral as bigint,
@@ -122,6 +118,15 @@ export const getProtocolState = async (
     liquidationRatio: lstate.liquidationRatio as bigint,
     mintingRatio: lstate.mintingRatio as bigint,
     totalSupply,
+    // v3 fields
+    oraclePrice: (lstate.oraclePrice as bigint | undefined) ?? 10000n,
+    oracleTimestamp: (lstate.oracleTimestamp as bigint | undefined) ?? 0n,
+    oracleStalenessLimit: (lstate.oracleStalenessLimit as bigint | undefined) ?? 1000n,
+    debtCeiling: (lstate.debtCeiling as bigint | undefined) ?? 10000000n,
+    liquidationPenalty: (lstate.liquidationPenalty as bigint | undefined) ?? 1300n,
+    insuranceFund: (lstate.insuranceFund as bigint | undefined) ?? 0n,
+    minDebt: (lstate.minDebt as bigint | undefined) ?? 100n,
+    paused: (lstate.paused as bigint | undefined) ?? 0n,
   };
 
   logger.info(
@@ -129,7 +134,10 @@ export const getProtocolState = async (
     `totalDebt=${state.totalDebt}, ` +
     `totalSupply=${state.totalSupply}, ` +
     `liquidationRatio=${state.liquidationRatio}%, ` +
-    `mintingRatio=${state.mintingRatio}%`,
+    `mintingRatio=${state.mintingRatio}%, ` +
+    `oraclePrice=${state.oraclePrice}, ` +
+    `debtCeiling=${state.debtCeiling}, ` +
+    `paused=${state.paused}`,
   );
   return state;
 };
@@ -196,11 +204,16 @@ export const getPosition = async (
   let isLiquidatable = false;
 
   if (debtAmount > 0n) {
-    collateralRatio = (collateralAmount * 100n) / debtAmount;
-    // We also need the liquidation ratio to evaluate liquidatability.
-    // For now check against the well-known default of 150%.
-    // In production, read this from the public state.
-    isLiquidatable = collateralRatio < 150n;
+    // v3: Oracle-price-aware ratio calculation
+    // Read protocol state to get current oracle price and liquidation ratio
+    const protocolState = await getProtocolState(providers, contractAddress);
+    const oraclePrice = protocolState?.oraclePrice ?? 10000n; // default $1.00
+    const liquidationRatio = protocolState?.liquidationRatio ?? 150n;
+
+    // ratio = (collateral * oraclePrice * 100) / (debt * PRICE_PRECISION)
+    // PRICE_PRECISION = 10000
+    collateralRatio = (collateralAmount * oraclePrice * 100n) / (debtAmount * 10000n);
+    isLiquidatable = collateralRatio < liquidationRatio;
   }
 
   return { collateralAmount, debtAmount, collateralRatio, isLiquidatable };
@@ -439,6 +452,93 @@ export const liquidate = async (
   const txData = await contract.callTx.liquidate(victimCollateral, victimDebt);
 
   logger.info(`liquidate confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+// ─── v3 Admin / Governance Operations ────────────────────────────────────────
+
+/**
+ * Update the oracle price. Price uses 4-decimal precision: $1.00 = 10000.
+ * Phase 1: caller-unrestricted (admin check at transport layer).
+ */
+export const updateOraclePrice = async (
+  contract: DeployedLendingContract,
+  newPrice: bigint,
+  blockHeight: bigint,
+): Promise<FinalizedTxData> => {
+  if (newPrice <= 0n) throw new Error('Price must be positive');
+  logger.info(`Updating oracle price to ${newPrice} (block ${blockHeight})...`);
+  const txData = await (contract.callTx as any).updateOraclePrice(newPrice, blockHeight);
+  logger.info(`updateOraclePrice confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+/**
+ * Update the minting ratio (e.g., 150 = 150%).
+ * Must be between 110% and 300%.
+ */
+export const updateMintingRatio = async (
+  contract: DeployedLendingContract,
+  newRatio: bigint,
+): Promise<FinalizedTxData> => {
+  logger.info(`Updating minting ratio to ${newRatio}%...`);
+  const txData = await (contract.callTx as any).updateMintingRatio(newRatio);
+  logger.info(`updateMintingRatio confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+/**
+ * Update the liquidation ratio (e.g., 150 = 150%).
+ * Must be between 110% and 300%.
+ */
+export const updateLiquidationRatio = async (
+  contract: DeployedLendingContract,
+  newRatio: bigint,
+): Promise<FinalizedTxData> => {
+  logger.info(`Updating liquidation ratio to ${newRatio}%...`);
+  const txData = await (contract.callTx as any).updateLiquidationRatio(newRatio);
+  logger.info(`updateLiquidationRatio confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+/**
+ * Update the system-wide debt ceiling.
+ */
+export const updateDebtCeiling = async (
+  contract: DeployedLendingContract,
+  newCeiling: bigint,
+): Promise<FinalizedTxData> => {
+  logger.info(`Updating debt ceiling to ${newCeiling}...`);
+  const txData = await (contract.callTx as any).updateDebtCeiling(newCeiling);
+  logger.info(`updateDebtCeiling confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+/**
+ * Pause or unpause the protocol.
+ * pauseState: 0 = active, 1 = paused.
+ */
+export const setPaused = async (
+  contract: DeployedLendingContract,
+  pauseState: bigint,
+): Promise<FinalizedTxData> => {
+  logger.info(`Setting protocol pause state to ${pauseState}...`);
+  const txData = await (contract.callTx as any).setPaused(pauseState);
+  logger.info(`setPaused confirmed in block ${txData.public.blockHeight}`);
+  return txData.public;
+};
+
+/**
+ * Fund the insurance reserve. Anyone can contribute.
+ */
+export const fundInsurance = async (
+  contract: DeployedLendingContract,
+  amount: bigint,
+): Promise<FinalizedTxData> => {
+  if (amount <= 0n) throw new Error('Fund amount must be positive');
+  logger.info(`Funding insurance reserve with ${amount}...`);
+  const txData = await (contract.callTx as any).fundInsurance(amount);
+  logger.info(`fundInsurance confirmed in block ${txData.public.blockHeight}`);
   return txData.public;
 };
 

@@ -1,10 +1,13 @@
-// pUSD Lending Protocol — In-Memory Test Simulator
+// pUSD Lending Protocol v3 — In-Memory Test Simulator
 //
 // Wraps the Compact-generated contract in a helper class that lets unit tests
 // call circuits in-memory without a network or proof server.
 //
-// Matches the generated Witnesses<PS> interface from Compact 0.20.x:
-//   (context: WitnessContext<Ledger, PS>) => [PS, bigint]
+// v3 changes:
+//   - Oracle price support (updateOraclePrice, getOraclePrice)
+//   - Admin governance circuits (updateMintingRatio, updateLiquidationRatio, etc.)
+//   - Debt ceiling, min debt, insurance fund, pause mechanism
+//   - Updated ratio checks use oracle price
 
 import {
     type CircuitContext,
@@ -61,9 +64,6 @@ export class LendingSimulator {
     }
 
     // ─── Private State Update ───────────────────────────────────────────────────
-    // In production, api.ts updates the private state in LevelDB after each
-    // confirmed transaction.  In tests we update it here to keep the simulator
-    // consistent.
 
     public setPrivateState(next: LendingPrivateState): void {
         this.circuitContext = {
@@ -72,7 +72,7 @@ export class LendingSimulator {
         };
     }
 
-    // ─── Circuit Wrappers ───────────────────────────────────────────────────────
+    // ─── Core Lending Circuits ──────────────────────────────────────────────────
 
     /** Simulate depositCollateral(amount) and update private state. */
     public depositCollateral(amount: bigint): Ledger {
@@ -128,6 +128,102 @@ export class LendingSimulator {
             .liquidate(this.circuitContext, victimCollateral, victimDebt)
             .context;
         return this.getLedger();
+    }
+
+    // ─── Admin / Governance Circuits ────────────────────────────────────────────
+
+    /** Update oracle price. Price uses 4-decimal precision: $1.00 = 10000. */
+    public updateOraclePrice(newPrice: bigint, blockHeight: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .updateOraclePrice(this.circuitContext, newPrice, blockHeight)
+            .context;
+        return this.getLedger();
+    }
+
+    public updateMintingRatio(newRatio: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .updateMintingRatio(this.circuitContext, newRatio)
+            .context;
+        return this.getLedger();
+    }
+
+    public updateLiquidationRatio(newRatio: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .updateLiquidationRatio(this.circuitContext, newRatio)
+            .context;
+        return this.getLedger();
+    }
+
+    public updateDebtCeiling(newCeiling: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .updateDebtCeiling(this.circuitContext, newCeiling)
+            .context;
+        return this.getLedger();
+    }
+
+    public updateStalenessLimit(newLimit: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .updateStalenessLimit(this.circuitContext, newLimit)
+            .context;
+        return this.getLedger();
+    }
+
+    public updateMinDebt(newMinDebt: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .updateMinDebt(this.circuitContext, newMinDebt)
+            .context;
+        return this.getLedger();
+    }
+
+    public updateLiquidationPenalty(newPenalty: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .updateLiquidationPenalty(this.circuitContext, newPenalty)
+            .context;
+        return this.getLedger();
+    }
+
+    public setPaused(pauseState: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .setPaused(this.circuitContext, pauseState)
+            .context;
+        return this.getLedger();
+    }
+
+    public fundInsurance(amount: bigint): Ledger {
+        this.circuitContext = this.contract.impureCircuits
+            .fundInsurance(this.circuitContext, amount)
+            .context;
+        return this.getLedger();
+    }
+
+    // ─── Read-Only Query Circuits ───────────────────────────────────────────────
+
+    public getOraclePrice(): bigint {
+        return this.contract.impureCircuits.getOraclePrice(this.circuitContext).result;
+    }
+
+    public getOracleTimestamp(): bigint {
+        return this.contract.impureCircuits.getOracleTimestamp(this.circuitContext).result;
+    }
+
+    public getDebtCeiling(): bigint {
+        return this.contract.impureCircuits.getDebtCeiling(this.circuitContext).result;
+    }
+
+    public getInsuranceFund(): bigint {
+        return this.contract.impureCircuits.getInsuranceFund(this.circuitContext).result;
+    }
+
+    public getMinDebt(): bigint {
+        return this.contract.impureCircuits.getMinDebt(this.circuitContext).result;
+    }
+
+    public getLiquidationPenalty(): bigint {
+        return this.contract.impureCircuits.getLiquidationPenalty(this.circuitContext).result;
+    }
+
+    public getPausedState(): bigint {
+        return this.contract.impureCircuits.getPausedState(this.circuitContext).result;
     }
 
     // ─── Token Circuits ─────────────────────────────────────────────────────────
