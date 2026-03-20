@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Witness Functions
+// pUSD Lending Protocol: Witness Functions
 //
 // Witnesses bridge between the user's local private state (LevelDB)
 // and the ZK proof engine.  Each witness function receives the current
@@ -11,23 +11,23 @@
 //
 // NOTE ON pUSD TOKEN BALANCES
 // ────────────────────────────
-// pUSD token balances (_balances, _totalSupply) are PUBLIC ledger state —
+// pUSD token balances (_balances, _totalSupply) are PUBLIC ledger state:
 // they do not need to be private witnesses. Only the user's DEBT POSITION
 // (how much they personally borrowed) remains private. This means:
 //
-//   • collateralAmount — private (ZK-proven, never on-chain)
-//   • debtAmount       — private (ZK-proven, never on-chain)
-//   • pUSD token bal   — public  (on-chain _balances map, queryable by anyone)
+//   • collateralAmount: private (ZK-proven, never on-chain)
+//   • debtAmount      : private (ZK-proven, never on-chain)
+//   • pUSD token bal  : public  (on-chain _balances map, queryable by anyone)
 
 import { type WitnessContext } from '@midnight-ntwrk/compact-runtime';
 import { type Ledger } from './managed/lending/contract/index.js';
 
 // ─── Per-User Private State ───────────────────────────────────────────────────
 //
-// Each user's collateral position is kept locally — never exposed on the public ledger.
+// Each user's collateral position is kept locally: never exposed on the public ledger.
 // The ZK proof certifies it satisfies the collateral constraints.
 //
-// pUSD token balance is NOT stored here — it is on the public ledger (_balances).
+// pUSD token balance is NOT stored here: it is on the public ledger (_balances).
 
 export type LendingPrivateState = {
   /** tNight deposited by this user as collateral */
@@ -36,7 +36,7 @@ export type LendingPrivateState = {
   debtAmount: bigint;
 };
 
-/** Zero position — used when no private state has been persisted yet */
+/** Zero position: used when no private state has been persisted yet */
 export const initialLendingPrivateState: LendingPrivateState = {
   collateralAmount: 0n,
   debtAmount: 0n,
@@ -50,7 +50,7 @@ export const initialLendingPrivateState: LendingPrivateState = {
 // The first element of the tuple is the (possibly updated) private state.
 // The second element is the value the circuit requested.
 //
-// In this protocol, witnesses are read-only — the private state update
+// In this protocol, witnesses are read-only: the private state update
 // happens explicitly in api.ts AFTER the transaction confirms, so that
 // on-chain failures do not corrupt local state.
 
@@ -68,7 +68,7 @@ export const witnesses = {
    * The ZK proof will verify repayment and ratio constraints against this.
    *
    * NOTE: This is the DEBT (how much was borrowed), not the token balance.
-   * Users can transfer pUSD freely — their token balance may differ from debt.
+   * Users can transfer pUSD freely: their token balance may differ from debt.
    * The ZK proof links the private debt to the public totalDebt counter.
    */
   debtAmount: (context: WitnessContext<Ledger, LendingPrivateState>): [LendingPrivateState, bigint] => {

@@ -1,7 +1,7 @@
 {
     "name": "@midnight-ntwrk/lending-ui",
     "version": "0.1.0",
-    "description": "pUSD Lending Protocol — React Frontend",
+    "description": "pUSD Lending Protocol: React Frontend",
     "license": "Apache-2.0",
     "private": true,
     "type": "module",

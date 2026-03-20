@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — TypeScript API Layer
+// pUSD Lending Protocol: TypeScript API Layer
 //
 // This module provides the high-level TypeScript API that wraps the
 // Compact-generated lending contract.  It handles:
@@ -77,9 +77,9 @@ globalThis.WebSocket = WebSocket;
  * Pre-compiled lending contract with ZK circuit assets loaded from the
  * managed/ directory produced by `npm run compact`.
  */
-const lendingCompiledContract = CompiledContract.make('lending', Lending.Contract).pipe(
-  CompiledContract.withWitnesses(witnesses),
-  CompiledContract.withCompiledFileAssets(contractConfig.zkConfigPath),
+const lendingCompiledContract: any = (CompiledContract as any).make('lending', Lending.Contract).pipe(
+  (CompiledContract as any).withWitnesses(witnesses),
+  (CompiledContract as any).withCompiledFileAssets(contractConfig.zkConfigPath),
 );
 
 // ─── Wallet Context ──────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ export interface WalletContext {
 
 /**
  * Read the lending protocol's public ledger state from the indexer.
- * Returns aggregate totals and ratio parameters — no private data.
+ * Returns aggregate totals and ratio parameters: no private data.
  */
 export const getProtocolState = async (
   providers: LendingProviders,
@@ -144,7 +144,7 @@ export const getProtocolState = async (
 
 /**
  * Query the pUSD token balance for a given ZswapCoinPublicKey (hex string).
- * pUSD balances are public ledger state — queryable by anyone.
+ * pUSD balances are public ledger state: queryable by anyone.
  */
 export const getPUSDBalance = async (
   providers: LendingProviders,
@@ -157,7 +157,7 @@ export const getPUSDBalance = async (
 
   const lstate = Lending.ledger(contractState.data) as any;
   // _balances is a Map<ZswapCoinPublicKey, Uint<128>>
-  // ZswapCoinPublicKey is a struct { bytes: Bytes<32> } — pass the struct, not a hex string.
+  // ZswapCoinPublicKey is a struct { bytes: Bytes<32> }: pass the struct, not a hex string.
   // Keep `as any` on Lending.ledger() to avoid authentication errors on stale managed types.
   try {
     const key = { bytes: Uint8Array.from(Buffer.from(publicKeyHex, 'hex')) };
@@ -189,7 +189,7 @@ export const getWalletBalances = async (
 
 /**
  * Read the calling user's PRIVATE position from the local LevelDB store.
- * This does NOT go to the network — it reads locally stored private state.
+ * This does NOT go to the network: it reads locally stored private state.
  */
 export const getPosition = async (
   providers: LendingProviders,
@@ -222,7 +222,7 @@ export const getPosition = async (
 // ─── Contract Instance & Deploy/Join ─────────────────────────────────────────
 
 /** Singleton lending contract instance (no witnesses needed at this level). */
-export const lendingContractInstance: LendingContract = new Lending.Contract(witnesses);
+export const lendingContractInstance: any = new Lending.Contract(witnesses as any);
 
 /**
  * Join an already-deployed lending contract by address.
@@ -232,14 +232,27 @@ export const joinContract = async (
   providers: LendingProviders,
   contractAddress: string,
 ): Promise<DeployedLendingContract> => {
+  // Preserve existing private state before rejoining: findDeployedContract
+  // will write initialPrivateState, which would reset our position.
+  const existingState = await providers.privateStateProvider.get(LendingPrivateStateId);
+
   const contract = await findDeployedContract(providers, {
     contractAddress,
     compiledContract: lendingCompiledContract,
     privateStateId: LendingPrivateStateId,
-    initialPrivateState: initialLendingPrivateState,
-  });
+    initialPrivateState: existingState ?? initialLendingPrivateState,
+  } as any);
+
+  // Restore private state if it was overwritten by findDeployedContract
+  if (existingState) {
+    await providers.privateStateProvider.set(LendingPrivateStateId, existingState);
+    logger.info(
+      `Restored private state: collateral=${existingState.collateralAmount}, debt=${existingState.debtAmount}`,
+    );
+  }
+
   logger.info(`Joined lending contract at: ${contract.deployTxData.public.contractAddress}`);
-  return contract;
+  return contract as DeployedLendingContract;
 };
 
 /**
@@ -252,9 +265,9 @@ export const deploy = async (providers: LendingProviders): Promise<DeployedLendi
     compiledContract: lendingCompiledContract,
     privateStateId: LendingPrivateStateId,
     initialPrivateState: initialLendingPrivateState,
-  });
+  } as any);
   logger.info(`Deployed lending contract at: ${contract.deployTxData.public.contractAddress}`);
-  return contract;
+  return contract as DeployedLendingContract;
 };
 
 // ─── Lending Operations ───────────────────────────────────────────────────────
@@ -302,7 +315,7 @@ export const depositCollateral = async (
 
   logger.info(`Depositing ${amount} tNight as collateral...`);
 
-  const txData = await contract.callTx.depositCollateral(amount);
+  const txData = await (contract.callTx as any).depositCollateral(amount);
 
   // Update private state: increment collateral
   await updatePrivateState(providers, (s) => ({
@@ -327,9 +340,31 @@ export const mintPUSD = async (
 ): Promise<FinalizedTxData> => {
   if (amount <= 0n) throw new Error('Mint amount must be positive');
 
+  // Check minimum debt threshold before attempting (saves proof time + gas on rejection)
+  const ps = (await providers.privateStateProvider.get(LendingPrivateStateId)) ?? initialLendingPrivateState;
+  const contractAddress = (contract as any).deployTxData?.public?.contractAddress;
+  if (contractAddress) {
+    try {
+      const protocolState = await getProtocolState(providers, contractAddress);
+      if (protocolState) {
+        const newTotalDebt = ps.debtAmount + amount;
+        if (newTotalDebt < protocolState.minDebt) {
+          throw new Error(
+            `Minting ${amount} pUSD would result in total debt of ${newTotalDebt} pUSD, ` +
+            `which is below the minimum vault debt of ${protocolState.minDebt} pUSD. ` +
+            `You must mint at least ${protocolState.minDebt - ps.debtAmount} pUSD.`,
+          );
+        }
+      }
+    } catch (e) {
+      // Only re-throw if it's our min-debt error; ignore network errors for the pre-check
+      if (e instanceof Error && e.message.includes('minimum vault debt')) throw e;
+    }
+  }
+
   logger.info(`Minting ${amount} pUSD...`);
 
-  const txData = await contract.callTx.mintPUSD(amount);
+  const txData = await (contract.callTx as any).mintPUSD(amount);
 
   // Update private state: increment debt
   await updatePrivateState(providers, (s) => ({
@@ -361,7 +396,7 @@ export const repayPUSD = async (
 
   const ps = (await providers.privateStateProvider.get(LendingPrivateStateId)) ?? initialLendingPrivateState;
   if (ps.debtAmount < amount) {
-    throw new Error(`Cannot repay ${amount} — current debt is only ${ps.debtAmount}`);
+    throw new Error(`Cannot repay ${amount}: current debt is only ${ps.debtAmount}`);
   }
 
   logger.info(`Repaying ${amount} pUSD (circuit will burn tokens + reduce totalDebt)...`);
@@ -369,7 +404,7 @@ export const repayPUSD = async (
   // The circuit: (1) burns amount pUSD from caller's token balance,
   //              (2) decrements totalDebt
   // Both happen atomically on-chain in the ZK proof.
-  const txData = await contract.callTx.repayPUSD(amount);
+  const txData = await (contract.callTx as any).repayPUSD(amount);
 
   // Update private state: decrement debt
   await updatePrivateState(providers, (s) => ({
@@ -396,12 +431,12 @@ export const withdrawCollateral = async (
 
   const ps = (await providers.privateStateProvider.get(LendingPrivateStateId)) ?? initialLendingPrivateState;
   if (ps.collateralAmount < amount) {
-    throw new Error(`Cannot withdraw ${amount} — only ${ps.collateralAmount} deposited`);
+    throw new Error(`Cannot withdraw ${amount}: only ${ps.collateralAmount} deposited`);
   }
 
   logger.info(`Withdrawing ${amount} tNight...`);
 
-  const txData = await contract.callTx.withdrawCollateral(amount);
+  const txData = await (contract.callTx as any).withdrawCollateral(amount);
 
   // Update private state: decrement collateral
   await updatePrivateState(providers, (s) => ({
@@ -440,16 +475,16 @@ export const liquidate = async (
 
   const ratio = (victimCollateral * 100n) / victimDebt;
   if (ratio >= 150n) {
-    throw new Error(`Position ratio is ${ratio}% — not liquidatable (must be < 150%)`);
+    throw new Error(`Position ratio is ${ratio}%: not liquidatable (must be < 150%)`);
   }
 
   logger.info(
     `Liquidating position: collateral=${victimCollateral}, debt=${victimDebt}, ratio=${ratio}%\n` +
-    `  Liquidator must hold ${victimDebt} pUSD tokens — they will be burned in-circuit.`,
+    `  Liquidator must hold ${victimDebt} pUSD tokens: they will be burned in-circuit.`,
   );
 
   // The circuit burns victimDebt pUSD from the caller, then seizes collateral
-  const txData = await contract.callTx.liquidate(victimCollateral, victimDebt);
+  const txData = await (contract.callTx as any).liquidate(victimCollateral, victimDebt);
 
   logger.info(`liquidate confirmed in block ${txData.public.blockHeight}`);
   return txData.public;

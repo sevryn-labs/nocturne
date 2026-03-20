@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Network Configuration for API Server
+// pUSD Lending Protocol: Network Configuration for API Server
 
 import path from 'node:path';
 import { setNetworkId } from '@midnight-ntwrk/midnight-js-network-id';

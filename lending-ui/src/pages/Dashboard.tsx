@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Dashboard Page
+// pUSD Lending Protocol: Dashboard Page
 // Shows public protocol state and private position snapshot.
 
 import React, { useEffect } from 'react';

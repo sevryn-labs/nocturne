@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Shared Types for API layer
+// pUSD Lending Protocol: Shared Types for API layer
 // Re-exports types from lending-cli for use in the REST server.
 
 import { Lending, type LendingPrivateState } from '@midnight-ntwrk/lending-contract';
@@ -25,7 +25,7 @@ export interface ProtocolState {
     totalDebt: bigint;
     liquidationRatio: bigint;
     mintingRatio: bigint;
-    /** pUSD token total supply — always equals totalDebt (supply == debt invariant) */
+    /** pUSD token total supply: always equals totalDebt (supply == debt invariant) */
     totalSupply: bigint;
     /** Oracle price with 4-decimal precision: $1.00 = 10000 */
     oraclePrice: bigint;

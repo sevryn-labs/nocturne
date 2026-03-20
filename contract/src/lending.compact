@@ -1,4 +1,4 @@
-// pUSD Lending Protocol v3 — Production-Grade Upgrade
+// pUSD Lending Protocol v3
 // Midnight Network  (Compact 0.28.0 / midnight-js 3.0.0)
 //
 // UPGRADE SUMMARY
@@ -35,12 +35,12 @@ import CompactStandardLibrary;
 
 // ─── Public Ledger State ─────────────────────────────────────────────────────
 
-// Aggregate accounting (Counter — supports increment/decrement)
+// Aggregate accounting (Counter: supports increment/decrement)
 export ledger totalCollateral: Counter;   // tNight held by protocol
 export ledger totalDebt: Counter;         // pUSD outstanding
 export ledger insuranceFund: Counter;     // Protocol reserve for bad debt
 
-// Configurable parameters (Uint — supports direct assignment for governance)
+// Configurable parameters (Uint: supports direct assignment for governance)
 export ledger liquidationRatio: Uint<64>;   // 150 = 150%
 export ledger mintingRatio: Uint<64>;       // 150 = 150%
 export ledger oraclePrice: Uint<64>;        // Price * 10000 ($1.00 = 10000)
@@ -77,7 +77,7 @@ constructor() {
   mintingRatio = disclose(150 as Uint<64>);
   liquidationPenalty = disclose(1300 as Uint<64>);   // 13% in basis points
 
-  // Oracle — initialized to $1.00, block 0
+  // Oracle: initialized to $1.00, block 0
   oraclePrice = disclose(10000 as Uint<64>);         // $1.00
   oracleTimestamp = disclose(0 as Uint<64>);
   oracleStalenessLimit = disclose(1000 as Uint<64>);  // ~1000 blocks
@@ -153,7 +153,7 @@ circuit _spendAllowance(
   }
 }
 
-// decimals() and totalSupply() are not needed as separate circuits —
+// decimals() and totalSupply() are not needed as separate circuits:
 // _decimals and _totalSupply are export ledger fields readable via indexer.
 
 export circuit balanceOf(account: ZswapCoinPublicKey): Uint<128> {
@@ -212,7 +212,7 @@ export circuit transferFrom(
 
 // ─── Circuit: depositCollateral ──────────────────────────────────────────────
 //
-// Deposits are always allowed (even when paused — risk-reducing).
+// Deposits are always allowed (even when paused: risk-reducing).
 // Oracle price is NOT required for deposits.
 
 export circuit depositCollateral(amount: Uint<64>): [] {
@@ -246,7 +246,7 @@ export circuit mintPUSD(amount: Uint<64>): [] {
   const myDebt       = debtAmount();
   const newDebt      = myDebt + amount;
 
-  // Minimum debt check — prevents dust positions
+  // Minimum debt check: prevents dust positions
   const minD: Uint<64> = minDebt;
   assert(newDebt >= minD, "Resulting debt below minimum threshold");
 
@@ -270,7 +270,7 @@ export circuit mintPUSD(amount: Uint<64>): [] {
 
 // ─── Circuit: repayPUSD ──────────────────────────────────────────────────────
 //
-// Repayments are always allowed (even when paused — risk-reducing).
+// Repayments are always allowed (even when paused: risk-reducing).
 
 export circuit repayPUSD(amount: Uint<64>): [] {
   assert(amount > 0, "Repay amount must be positive");

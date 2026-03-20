@@ -1,7 +1,7 @@
 {
   "name": "@midnight-ntwrk/lending-contract",
   "version": "0.1.0",
-  "description": "pUSD collateralised lending protocol on Midnight — Compact smart contract",
+  "description": "pUSD collateralised lending protocol on Midnight: Compact smart contract",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",

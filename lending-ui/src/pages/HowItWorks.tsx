@@ -5,15 +5,15 @@ import React, { useState } from 'react';
 type StepKey = 'pusd' | 'collateral' | 'liquidation' | 'privacy';
 
 const STEPS: { key: StepKey; n: string; title: string }[] = [
-  { key: 'pusd',        n: '01', title: 'What is pUSD?'       },
-  { key: 'collateral',  n: '02', title: 'Collateral & Debt'   },
-  { key: 'liquidation', n: '03', title: 'Liquidation'         },
-  { key: 'privacy',     n: '04', title: 'Privacy & ZK Proofs' },
+  { key: 'pusd', n: '01', title: 'What is pUSD?' },
+  { key: 'collateral', n: '02', title: 'Collateral & Debt' },
+  { key: 'liquidation', n: '03', title: 'Liquidation' },
+  { key: 'privacy', n: '04', title: 'Privacy & ZK Proofs' },
 ];
 
 const PRIVACY_ITEMS = {
   private: ['Individual Collateral', 'Individual Debt', 'Wallet Addresses'],
-  public:  ['Total Protocol Collateral', 'Total Protocol Debt', 'Liquidation Ratios'],
+  public: ['Total Protocol Collateral', 'Total Protocol Debt', 'Liquidation Ratios'],
 };
 
 // ─── Crescent ─────────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ const PUSDSection: React.FC = () => (
       </div>
     </div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      <InfoChip icon="◎" title="Synthetic Unit" body="pUSD is an internal accounting mechanism — not a transferable token on the public chain." />
+      <InfoChip icon="◎" title="Synthetic Unit" body="pUSD is an internal accounting mechanism: not a transferable token on the public chain." />
       <InfoChip icon="🔒" title="Overcollateralised" body="Every pUSD is backed by ≥ 150% of its value in locked tNight collateral." />
       <InfoChip icon="⛓" title="On-Chain Settlement" body="All positions are enforced by a Midnight Network smart contract with no admin keys." />
     </div>
@@ -184,7 +184,7 @@ const LiquidationSection: React.FC = () => (
     </div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <InfoChip icon="⚡" title="Anyone Can Liquidate" body="Liquidation is a permissionless public action to keep the protocol solvent." />
-      <InfoChip icon="💸" title="Liquidator Incentive" body="The liquidator repays the debt and receives the full locked collateral — profitably." />
+      <InfoChip icon="💸" title="Liquidator Incentive" body="The liquidator repays the debt and receives the full locked collateral: profitably." />
       <InfoChip icon="🛡" title="How to Stay Safe" body="Keep your ratio well above 150%. Deposit more collateral or repay debt regularly." />
     </div>
   </div>
@@ -230,7 +230,7 @@ const PrivacySection: React.FC = () => (
     </div>
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <InfoChip icon="◈" title="Prove Without Revealing" body="ZKPs let you cryptographically prove your collateral is sufficient without disclosing the amount." />
-      <InfoChip icon="🌑" title="Private by Default" body="Individual positions are never exposed on the public ledger — only aggregated totals are visible." />
+      <InfoChip icon="🌑" title="Private by Default" body="Individual positions are never exposed on the public ledger: only aggregated totals are visible." />
       <InfoChip icon="⚡" title="Local Proof Generation" body="ZK proofs are computed on your machine before submission. Your data never leaves your browser." />
     </div>
   </div>
@@ -239,10 +239,10 @@ const PrivacySection: React.FC = () => (
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const SECTIONS: Record<StepKey, React.ReactNode> = {
-  pusd:        <PUSDSection />,
-  collateral:  <CollateralSection />,
+  pusd: <PUSDSection />,
+  collateral: <CollateralSection />,
   liquidation: <LiquidationSection />,
-  privacy:     <PrivacySection />,
+  privacy: <PrivacySection />,
 };
 
 export const HowItWorks: React.FC = () => {

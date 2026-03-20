@@ -1,5 +1,5 @@
 import * as __compactRuntime from '@midnight-ntwrk/compact-runtime';
-__compactRuntime.checkRuntimeVersion('0.14.0');
+__compactRuntime.checkRuntimeVersion('0.15.0');
 
 const _descriptor_0 = new __compactRuntime.CompactTypeUnsignedInteger(18446744073709551615n, 8);
 
@@ -508,6 +508,18 @@ export class Contract {
       }
     };
     this.impureCircuits = {
+      balanceOf: this.circuits.balanceOf,
+      allowance: this.circuits.allowance,
+      transfer: this.circuits.transfer,
+      approve: this.circuits.approve,
+      transferFrom: this.circuits.transferFrom,
+      depositCollateral: this.circuits.depositCollateral,
+      mintPUSD: this.circuits.mintPUSD,
+      repayPUSD: this.circuits.repayPUSD,
+      withdrawCollateral: this.circuits.withdrawCollateral,
+      liquidate: this.circuits.liquidate
+    };
+    this.provableCircuits = {
       balanceOf: this.circuits.balanceOf,
       allowance: this.circuits.allowance,
       transfer: this.circuits.transfer,
@@ -1639,7 +1651,9 @@ export class Contract {
                                                                                                                      alignment: _descriptor_9.alignment() } }] } },
                                                                                           { popeq: { cached: true,
                                                                                                      result: undefined } }]).value);
-    __compactRuntime.assert(currentTotalDebt_0 + amount_0 <= ceiling_0,
+    let t_0;
+    __compactRuntime.assert((t_0 = currentTotalDebt_0 + amount_0,
+                             t_0 <= ceiling_0),
                             'System debt ceiling reached');
     const price_0 = _descriptor_0.fromValue(__compactRuntime.queryLedgerState(context,
                                                                               partialProofData,
@@ -1671,9 +1685,9 @@ export class Contract {
                                                                                                           alignment: _descriptor_9.alignment() } }] } },
                                                                                { popeq: { cached: false,
                                                                                           result: undefined } }]).value);
-    __compactRuntime.assert(myCollateral_0 * price_0 * 100n
-                            >=
-                            newDebt_0 * ratio_0 * 10000n,
+    let t_1;
+    __compactRuntime.assert((t_1 = myCollateral_0 * price_0 * 100n,
+                             t_1 >= newDebt_0 * ratio_0 * 10000n),
                             'Insufficient collateral: ratio below minting threshold');
     const tmp_0 = ((t1) => {
                     if (t1 > 65535n) {
@@ -1796,9 +1810,9 @@ export class Contract {
                                                                                                           alignment: _descriptor_9.alignment() } }] } },
                                                                                { popeq: { cached: false,
                                                                                           result: undefined } }]).value);
-    __compactRuntime.assert(remaining_0 * price_0 * 100n
-                            >=
-                            myDebt_0 * ratio_0 * 10000n,
+    let t_0;
+    __compactRuntime.assert((t_0 = remaining_0 * price_0 * 100n,
+                             t_0 >= myDebt_0 * ratio_0 * 10000n),
                             'Withdrawal would breach liquidation ratio');
     const tmp_0 = ((t1) => {
                     if (t1 > 65535n) {
@@ -1878,9 +1892,9 @@ export class Contract {
                                                                                                           alignment: _descriptor_9.alignment() } }] } },
                                                                                { popeq: { cached: false,
                                                                                           result: undefined } }]).value);
-    __compactRuntime.assert(victimCollateral_0 * price_0 * 100n
-                            <
-                            victimDebt_0 * ratio_0 * 10000n,
+    let t_0;
+    __compactRuntime.assert((t_0 = victimCollateral_0 * price_0 * 100n,
+                             t_0 < victimDebt_0 * ratio_0 * 10000n),
                             'Position is not undercollateralised');
     this.__burn_0(context,
                   partialProofData,

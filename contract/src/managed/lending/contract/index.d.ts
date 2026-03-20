@@ -32,6 +32,33 @@ export type ImpureCircuits<PS> = {
             victimDebt_0: bigint): __compactRuntime.CircuitResults<PS, []>;
 }
 
+export type ProvableCircuits<PS> = {
+  balanceOf(context: __compactRuntime.CircuitContext<PS>,
+            account_0: { bytes: Uint8Array }): __compactRuntime.CircuitResults<PS, bigint>;
+  allowance(context: __compactRuntime.CircuitContext<PS>,
+            owner_0: { bytes: Uint8Array },
+            spender_0: { bytes: Uint8Array }): __compactRuntime.CircuitResults<PS, bigint>;
+  transfer(context: __compactRuntime.CircuitContext<PS>,
+           to_0: { bytes: Uint8Array },
+           value_0: bigint): __compactRuntime.CircuitResults<PS, boolean>;
+  approve(context: __compactRuntime.CircuitContext<PS>,
+          spender_0: { bytes: Uint8Array },
+          value_0: bigint): __compactRuntime.CircuitResults<PS, boolean>;
+  transferFrom(context: __compactRuntime.CircuitContext<PS>,
+               tokenOwner_0: { bytes: Uint8Array },
+               to_0: { bytes: Uint8Array },
+               value_0: bigint): __compactRuntime.CircuitResults<PS, boolean>;
+  depositCollateral(context: __compactRuntime.CircuitContext<PS>,
+                    amount_0: bigint): __compactRuntime.CircuitResults<PS, []>;
+  mintPUSD(context: __compactRuntime.CircuitContext<PS>, amount_0: bigint): __compactRuntime.CircuitResults<PS, []>;
+  repayPUSD(context: __compactRuntime.CircuitContext<PS>, amount_0: bigint): __compactRuntime.CircuitResults<PS, []>;
+  withdrawCollateral(context: __compactRuntime.CircuitContext<PS>,
+                     amount_0: bigint): __compactRuntime.CircuitResults<PS, []>;
+  liquidate(context: __compactRuntime.CircuitContext<PS>,
+            victimCollateral_0: bigint,
+            victimDebt_0: bigint): __compactRuntime.CircuitResults<PS, []>;
+}
+
 export type PureCircuits = {
 }
 
@@ -103,6 +130,7 @@ export declare class Contract<PS = any, W extends Witnesses<PS> = Witnesses<PS>>
   witnesses: W;
   circuits: Circuits<PS>;
   impureCircuits: ImpureCircuits<PS>;
+  provableCircuits: ProvableCircuits<PS>;
   constructor(witnesses: W);
   initialState(context: __compactRuntime.ConstructorContext<PS>): __compactRuntime.ConstructorResult<PS>;
 }

@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Contract Package Entry Point
+// pUSD Lending Protocol: Contract Package Entry Point
 //
 // Exports both flat names (for internal use) and the `Lending` namespace
 // (expected by api.ts and common-types.ts, following the midnight-js convention).

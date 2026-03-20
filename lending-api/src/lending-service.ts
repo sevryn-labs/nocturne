@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Core Lending Service
+// pUSD Lending Protocol: Core Lending Service
 //
 // Wraps all wallet, provider, and contract logic into a stateful service
 // that the Express server can call. Extracted from lending-cli/src/api.ts,
@@ -285,7 +285,7 @@ export class LendingService {
 
         this.contractJoinPromise = (async () => {
             try {
-                // Preserve existing private state before rejoining — findDeployedContract
+                // Preserve existing private state before rejoining: findDeployedContract
                 // will write initialPrivateState, which would reset our position.
                 const existingState = await this.providers!.privateStateProvider.get(LendingPrivateStateId);
 
@@ -388,6 +388,20 @@ export class LendingService {
         this.requireContract();
         if (amount <= 0n) throw new Error('Mint amount must be positive');
 
+        // Check minimum debt threshold before attempting (saves proof time + gas on rejection)
+        const ps = (await this.providers!.privateStateProvider.get(LendingPrivateStateId)) ?? initialLendingPrivateState;
+        const protocolState = await this.getPublicState();
+        if (protocolState) {
+            const newTotalDebt = ps.debtAmount + amount;
+            if (newTotalDebt < protocolState.minDebt) {
+                throw new Error(
+                    `Minting ${amount} pUSD would result in total debt of ${newTotalDebt} pUSD, ` +
+                    `which is below the minimum vault debt of ${protocolState.minDebt} pUSD. ` +
+                    `You must mint at least ${protocolState.minDebt - ps.debtAmount} pUSD.`,
+                );
+            }
+        }
+
         const txData = await this.contract!.callTx.mintPUSD(amount);
 
         await this.updatePrivateState((s) => ({
@@ -405,11 +419,11 @@ export class LendingService {
         const ps = await this.providers!.privateStateProvider.get(LendingPrivateStateId);
         const state = ps ?? initialLendingPrivateState;
         if (state.debtAmount < amount) {
-            throw new Error(`Cannot repay ${amount} — current debt is only ${state.debtAmount}`);
+            throw new Error(`Cannot repay ${amount}: current debt is only ${state.debtAmount}`);
         }
 
         // The circuit burns `amount` pUSD from the caller's token balance
-        // AND decrements totalDebt — both happen atomically in the ZK proof.
+        // AND decrements totalDebt: both happen atomically in the ZK proof.
         // The caller must hold >= amount pUSD tokens in their wallet.
         const txData = await this.contract!.callTx.repayPUSD(amount);
 
@@ -428,7 +442,7 @@ export class LendingService {
         const ps = await this.providers!.privateStateProvider.get(LendingPrivateStateId);
         const state = ps ?? initialLendingPrivateState;
         if (state.collateralAmount < amount) {
-            throw new Error(`Cannot withdraw ${amount} — only ${state.collateralAmount} deposited`);
+            throw new Error(`Cannot withdraw ${amount}: only ${state.collateralAmount} deposited`);
         }
 
         const txData = await this.contract!.callTx.withdrawCollateral(amount);
@@ -448,7 +462,7 @@ export class LendingService {
 
         const ratio = (victimCollateral * 100n) / victimDebt;
         if (ratio >= 150n) {
-            throw new Error(`Position ratio is ${ratio}% — not liquidatable (must be < 150%)`);
+            throw new Error(`Position ratio is ${ratio}%: not liquidatable (must be < 150%)`);
         }
 
         // IMPORTANT: The caller must hold >= victimDebt pUSD tokens.

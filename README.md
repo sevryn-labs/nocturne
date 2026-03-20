@@ -2,7 +2,7 @@
 
 [![Generic badge](https://img.shields.io/badge/Compact%20Toolchain-0.28.0-1abc9c.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/midnight--js-3.0.0-blueviolet.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/wallet--sdk--facade-1.0.0-blue.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Tests-100%2B%20passing-brightgreen.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Version-3.0.0-orange.svg)](https://shields.io/)
 
-A **privacy-preserving collateralised lending protocol** built on the [Midnight Network](https://midnight.network). Deposit tNight as collateral, mint pUSD synthetic stablecoins, and maintain positions privately via zero-knowledge proofs — individual debt and collateral amounts are never exposed on-chain.
+A **privacy-preserving collateralised lending protocol** built on the [Midnight Network](https://midnight.network). Deposit tNight as collateral, mint pUSD synthetic stablecoins, and maintain positions privately via zero-knowledge proofs: individual debt and collateral amounts are never exposed on-chain.
 
 > Conceptually equivalent to MakerDAO/Liquity, built for Midnight's ZK-first architecture.
 
@@ -11,10 +11,10 @@ A **privacy-preserving collateralised lending protocol** built on the [Midnight 
 ## Recent Updates (v3)
 - ✅ **Oracle Price Feed:** All ratio checks now use oracle prices with 4-decimal precision ($1.00 = 10000). Admin-updateable via `updateOraclePrice` circuit.
 - ✅ **Debt Ceiling:** System-wide cap on total pUSD issuance (default: 10M). Prevents unbounded protocol exposure.
-- ✅ **Governance Circuits:** 8 admin-callable circuits for live parameter tuning — minting ratio, liquidation ratio, penalty, staleness limit, debt ceiling, minimum debt, and pause control.
+- ✅ **Governance Circuits:** 8 admin-callable circuits for live parameter tuning: minting ratio, liquidation ratio, penalty, staleness limit, debt ceiling, minimum debt, and pause control.
 - ✅ **Insurance Fund:** On-chain `Counter` for protocol reserves. Anyone can contribute via `fundInsurance()`. Liquidation penalty fees route here.
 - ✅ **Pause Mechanism:** Emergency pause blocks risky operations (mint, withdraw, liquidate, transfer) while risk-reducing operations (deposit, repay) remain available.
-- ✅ **Minimum Debt:** Dust prevention — vaults must maintain a minimum debt position (default: 100 pUSD).
+- ✅ **Minimum Debt:** Dust prevention: vaults must maintain a minimum debt position (default: 100 pUSD).
 - ✅ **100+ Tests:** Test suite expanded from 48 to 100+ across 22 sections, including oracle stress tests and combined constraint enforcement.
 - ✅ **Admin REST API:** 6 new `/api/admin/*` endpoints for governance operations.
 
@@ -26,8 +26,8 @@ A **privacy-preserving collateralised lending protocol** built on the [Midnight 
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
 - [Prerequisites](#prerequisites)
-- [Quick Start — Web UI](#quick-start--web-ui)
-- [Quick Start — CLI](#quick-start--cli)
+- [Quick Start: Web UI](#quick-start--web-ui)
+- [Quick Start: CLI](#quick-start--cli)
 - [Web Frontend Features](#web-frontend-features)
 - [API Endpoints](#api-endpoints)
 - [Using the CLI](#using-the-lending-protocol-cli)
@@ -52,7 +52,7 @@ Deposit tNight → Mint pUSD (up to 66% of collateral value)
 
 ### Economic Rules
 
-All rules are enforced entirely inside the Compact ZK circuit — no off-chain trust required:
+All rules are enforced entirely inside the Compact ZK circuit: no off-chain trust required:
 
 | Rule | Constraint (v3 with oracle price) |
 |------|-----------------------------------|
@@ -78,8 +78,8 @@ All rules are enforced entirely inside the Compact ZK circuit — no off-chain t
 | `debtCeiling` / `minDebt` | 🌐 Public | System limits |
 | `insuranceFund` | 🌐 Public | Protocol reserve balance |
 | `paused` | 🌐 Public | Emergency pause state |
-| **Your collateral** | 🔒 Private | Hidden in ZK — never on-chain |
-| **Your debt** | 🔒 Private | Hidden in ZK — never on-chain |
+| **Your collateral** | 🔒 Private | Hidden in ZK: never on-chain |
+| **Your debt** | 🔒 Private | Hidden in ZK: never on-chain |
 | **pUSD Balances** | 🌐 Public | ERC20-style transparent balances on-chain |
 | **Your identity** | 🔒 Private | Pseudonymous (Midnight public key only) |
 
@@ -89,7 +89,7 @@ Private state lives in a user-controlled local LevelDB database and is supplied 
 
 ## Architecture
 
-The protocol supports two interaction modes — a **React Web UI** and a **terminal CLI** — both backed by the same contract and wallet SDK:
+The protocol supports two interaction modes: a **React Web UI** and a **terminal CLI**: both backed by the same contract and wallet SDK:
 
 ```
 ┌──────────────────────┐    ┌─────────────────────────────────────┐
@@ -147,9 +147,9 @@ The protocol supports two interaction modes — a **React Web UI** and a **termi
 > directly via the Midnight indexer. No dedicated query circuits are needed.
 
 The **wallet** is composed of three sub-wallets orchestrated by `WalletFacade`:
-- **ShieldedWallet** — ZK-shielded transactions (zswap)
-- **UnshieldedWallet** — transparent tNight transactions
-- **DustWallet** — dust fee token management
+- **ShieldedWallet**: ZK-shielded transactions (zswap)
+- **UnshieldedWallet**: transparent tNight transactions
+- **DustWallet**: dust fee token management
 
 ---
 
@@ -222,9 +222,9 @@ lending_protocol/
 
 ## Prerequisites
 
-- **[Node.js v20+](https://nodejs.org/)** — `node --version` to check
-  > Node.js v22+ is recommended for full SDK compatibility. On v20, a few wallet SDK methods use [Iterator Helpers](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator) (`.entries().every()`, `Set.union()`, `.keys().toArray()`) that require manual patching — see [Troubleshooting](#troubleshooting).
-- **[Docker](https://docs.docker.com/get-docker/)** with `docker compose` — for the proof server and standalone mode
+- **[Node.js v20+](https://nodejs.org/)**: `node --version` to check
+  > Node.js v22+ is recommended for full SDK compatibility. On v20, a few wallet SDK methods use [Iterator Helpers](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Iterator) (`.entries().every()`, `Set.union()`, `.keys().toArray()`) that require manual patching: see [Troubleshooting](#troubleshooting).
+- **[Docker](https://docs.docker.com/get-docker/)** with `docker compose`: for the proof server and standalone mode
 
 ### Compact Developer Tools
 
@@ -250,7 +250,7 @@ compact compile --version
 
 ---
 
-## Quick Start — Web UI
+## Quick Start: Web UI
 
 The recommended way to interact with the lending protocol is via the **React Web UI**.
 
@@ -334,11 +334,11 @@ Open **http://localhost:5173** in your browser. The Vite dev server proxies API 
 
 ---
 
-## Quick Start — CLI
+## Quick Start: CLI
 
 The original terminal CLI is still fully functional.
 
-**Option A — Preprod with auto-start proof server (recommended for first run):**
+**Option A: Preprod with auto-start proof server (recommended for first run):**
 
 ```bash
 cd lending-cli
@@ -347,24 +347,24 @@ npm run preprod-ps
 
 This pulls the proof server Docker image, starts it, then launches the CLI connected to the public Preprod testnet.
 
-**Option B — Preprod with manual proof server:**
+**Option B: Preprod with manual proof server:**
 
 ```bash
-# Terminal 1 — proof server
+# Terminal 1: proof server
 cd lending-cli && docker compose -f proof-server.yml up
 
-# Terminal 2 — CLI (once proof server shows "listening on 0.0.0.0:6300")
+# Terminal 2: CLI (once proof server shows "listening on 0.0.0.0:6300")
 cd lending-cli && npm run preprod
 ```
 
-**Option C — Fully local standalone (no testnet needed):**
+**Option C: Fully local standalone (no testnet needed):**
 
 ```bash
 cd lending-cli
 npm run standalone
 ```
 
-Starts a complete local Midnight stack via Docker Compose (node, indexer, proof server) with a pre-funded genesis wallet — no faucet needed.
+Starts a complete local Midnight stack via Docker Compose (node, indexer, proof server) with a pre-funded genesis wallet: no faucet needed.
 
 ---
 
@@ -388,7 +388,7 @@ Starts a complete local Midnight stack via Docker Compose (node, indexer, proof 
   [3] Exit
 ```
 
-- Choose **[1]** for a fresh wallet — the CLI prints your seed and unshielded address.
+- Choose **[1]** for a fresh wallet: the CLI prints your seed and unshielded address.
 - Choose **[2]** to restore an existing wallet with its 64-hex seed.
 - In **standalone mode**, the genesis wallet is loaded automatically (no prompt).
 
@@ -401,7 +401,7 @@ Starts a complete local Midnight stack via Docker Compose (node, indexer, proof 
 3. Paste your address and request tNight.
 4. The CLI detects incoming funds automatically.
 
-> In standalone mode, the genesis wallet is pre-funded — skip this step.
+> In standalone mode, the genesis wallet is pre-funded: skip this step.
 
 ### Step 3: Wait for DUST
 
@@ -425,10 +425,10 @@ After receiving tNight, the CLI registers your NIGHT UTXOs for DUST generation. 
   [5] Exit
 ```
 
-- **[1] Deploy** — creates a new lending protocol on-chain. Save the contract address shown on success.
-- **[2] Join** — enter a contract address to interact with an existing deployment.
-- **[3] Monitor** — live-stream your DUST balance (useful while waiting for generation).
-- **[4] View Coin Public Key** — display your ZSwap shielded public key.
+- **[1] Deploy**: creates a new lending protocol on-chain. Save the contract address shown on success.
+- **[2] Join**: enter a contract address to interact with an existing deployment.
+- **[3] Monitor**: live-stream your DUST balance (useful while waiting for generation).
+- **[4] View Coin Public Key**: display your ZSwap shielded public key.
 
 > **Tip:** You can run multiple CLI tabs with different seeds to simulate multi-user behavior. The LevelDB state is isolated per wallet, preventing any cross-wallet AES encryption conflicts.
 
@@ -516,12 +516,12 @@ The React UI (`lending-ui/`) provides four pages:
 
 ### UX Highlights
 
-- **Live Ratio Preview** — When typing amounts in mint/withdraw/deposit/repay forms, the new collateral ratio is calculated and displayed instantly with color-coded health warnings
-- **Health Indicator** — Color-coded badge (🛡 Healthy / ⚠️ At Risk / 🚨 Critical) with animated ratio bar and liquidation threshold markers
-- **ZK Proof Feedback** — Loading states with estimated timing for proof generation
-- **Error Classification** — Errors are categorized (`WALLET_NOT_INITIALIZED`, `INSUFFICIENT_BALANCE`, `PROOF_SERVER_DOWN`, etc.) and displayed with user-friendly messages
-- **Auto-Refresh** — Protocol state refreshes every 30 seconds; position refreshes after every action
-- **Premium Dark Theme** — Glassmorphism, gradient accents, Inter + JetBrains Mono typography, micro-animations
+- **Live Ratio Preview**: When typing amounts in mint/withdraw/deposit/repay forms, the new collateral ratio is calculated and displayed instantly with color-coded health warnings
+- **Health Indicator**: Color-coded badge (🛡 Healthy / ⚠️ At Risk / 🚨 Critical) with animated ratio bar and liquidation threshold markers
+- **ZK Proof Feedback**: Loading states with estimated timing for proof generation
+- **Error Classification**: Errors are categorized (`WALLET_NOT_INITIALIZED`, `INSUFFICIENT_BALANCE`, `PROOF_SERVER_DOWN`, etc.) and displayed with user-friendly messages
+- **Auto-Refresh**: Protocol state refreshes every 30 seconds; position refreshes after every action
+- **Premium Dark Theme**: Glassmorphism, gradient accents, Inter + JetBrains Mono typography, micro-animations
 
 ---
 
@@ -534,16 +534,16 @@ The REST API server (`lending-api/`) exposes the following endpoints on **http:/
 | Method | Endpoint | Body | Description |
 |--------|----------|------|-------------|
 | `POST` | `/api/wallet/initialize` | `{ seed?: string }` | Create or restore wallet |
-| `GET` | `/api/wallet/info` | — | Get wallet balances and addresses |
-| `POST` | `/api/wallet/wait-for-funds` | — | Block until tNight balance > 0 |
-| `POST` | `/api/wallet/register-dust` | — | Register for DUST generation |
-| `GET` | `/api/wallet/dust` | — | Get DUST balance |
+| `GET` | `/api/wallet/info` |: | Get wallet balances and addresses |
+| `POST` | `/api/wallet/wait-for-funds` |: | Block until tNight balance > 0 |
+| `POST` | `/api/wallet/register-dust` |: | Register for DUST generation |
+| `GET` | `/api/wallet/dust` |: | Get DUST balance |
 
 ### Contract
 
 | Method | Endpoint | Body | Description |
 |--------|----------|------|-------------|
-| `POST` | `/api/contract/deploy` | — | Deploy a new lending contract |
+| `POST` | `/api/contract/deploy` |: | Deploy a new lending contract |
 | `POST` | `/api/contract/join` | `{ address: string }` | Join existing contract |
 
 ### State
@@ -614,7 +614,7 @@ npm test
    ✓ 22. Combined System Integrity Tests (2)
 ```
 
-Tests run against the `LendingSimulator` — an in-memory harness that wraps the Compact-generated contract. No Midnight node, no proof server, no Docker needed.
+Tests run against the `LendingSimulator`: an in-memory harness that wraps the Compact-generated contract. No Midnight node, no proof server, no Docker needed.
 
 ---
 
@@ -633,7 +633,7 @@ Starts a complete local Midnight stack via Docker Compose:
 | `lending-indexer` | `midnightntwrk/indexer-standalone:3.0.0` | Block indexer + GraphQL API |
 | `lending-proof-server` | `midnightntwrk/proof-server:7.0.0` | ZK proof generation |
 
-Uses the genesis seed (`0...01`) with pre-minted tNight — no faucet needed.
+Uses the genesis seed (`0...01`) with pre-minted tNight: no faucet needed.
 
 ---
 
@@ -686,12 +686,12 @@ MIDNIGHT_NETWORK=standalone PORT=4000 npm run dev:api
 | `Insufficient collateral: ratio below minting threshold` | Your collateral ratio would drop below 150% after minting. Deposit more collateral first. Formula: need `collateral ≥ (currentDebt + mintAmount) × 1.5` |
 | `Withdrawal would breach liquidation ratio` | Withdrawing would push your ratio below 150%. Repay some debt first. |
 | Proof server hangs on Mac ARM (Apple Silicon) | Docker Desktop → Settings → General → "Virtual Machine Options" → select **Docker VMM**. Restart Docker. |
-| `Failed to clone intent` during deploy | Wallet SDK signing bug — already worked around in this codebase (see `signTransactionIntents` in `api.ts`) |
+| `Failed to clone intent` during deploy | Wallet SDK signing bug: already worked around in this codebase (see `signTransactionIntents` in `api.ts`) |
 | DUST balance drops to 0 after failed tx | Known wallet SDK 1.0.0 issue. Restart the CLI to release locked DUST coins |
 | Wallet shows 0 balance after faucet | Wait for sync to complete. Confirm you used the correct **unshielded** address (`mn_addr_...`) |
-| `Cannot find module './managed/lending/contract/index.js'` | Contract not compiled yet — run `cd contract && npm run compact` first |
+| `Cannot find module './managed/lending/contract/index.js'` | Contract not compiled yet: run `cd contract && npm run compact` first |
 | Tests fail with "Cannot find module" | Build the contract first: `cd contract && npm run compact && npm run build` |
-| Node.js warnings about experimental features | Normal — `--loader ts-node/esm` triggers these; they don't affect functionality |
+| Node.js warnings about experimental features | Normal: `--loader ts-node/esm` triggers these; they don't affect functionality |
 
 ---
 
@@ -718,28 +718,30 @@ MIDNIGHT_NETWORK=standalone PORT=4000 npm run dev:api
 
 v3 delivers a production-grade foundation. Remaining items for full mainnet readiness:
 
-- ~~**Oracle Price Feed:**~~ ✅ Implemented in v3 — `oraclePrice` with 4-decimal precision, `updateOraclePrice` admin circuit, staleness protection.
-- ~~**Governance Circuits:**~~ ✅ Implemented in v3 — 8 admin circuits for live parameter tuning.
-- ~~**Debt Ceiling & Min Debt:**~~ ✅ Implemented in v3 — system-wide debt cap and dust prevention.
-- ~~**Insurance Fund:**~~ ✅ Implemented in v3 — on-chain protocol reserve.
-- ~~**Pause Mechanism:**~~ ✅ Implemented in v3 — emergency circuit with selective operation blocking.
-- **On-chain Admin Access Control:** Phase 2 — verify caller == admin key in governance circuits (currently enforced at API layer).
-- **Multi-sig Governance:** Phase 2 — N-of-M key holder approval for parameter changes.
-- **Timelock:** Phase 3 — 48h delay on parameter changes before activation.
-- **Decentralized Oracles:** Phase 3 — integrate DIA/Chainlink via ZK-bridged price feeds.
-- **Redemption Mechanism:** Peg stability — allow pUSD holders to redeem at $1 from riskiest vaults.
+- ~~**Oracle Price Feed:**~~ ✅ Implemented in v3: `oraclePrice` with 4-decimal precision, `updateOraclePrice` admin circuit, staleness protection.
+- ~~**Governance Circuits:**~~ ✅ Implemented in v3: 8 admin circuits for live parameter tuning.
+- ~~**Debt Ceiling & Min Debt:**~~ ✅ Implemented in v3: system-wide debt cap and dust prevention.
+- ~~**Insurance Fund:**~~ ✅ Implemented in v3: on-chain protocol reserve.
+- ~~**Pause Mechanism:**~~ ✅ Implemented in v3: emergency circuit with selective operation blocking.
+- **On-chain Admin Access Control:** Phase 2: verify caller == admin key in governance circuits (currently enforced at API layer).
+- **Multi-sig Governance:** Phase 2: N-of-M key holder approval for parameter changes.
+- **Timelock:** Phase 3: 48h delay on parameter changes before activation.
+- **Decentralized Oracles:** Phase 3: integrate DIA/Chainlink via ZK-bridged price feeds.
+- **Redemption Mechanism:** Peg stability: allow pUSD holders to redeem at $1 from riskiest vaults.
 - **Stability Fee:** Dynamic interest rate adjustable via governance to maintain the $1 peg.
 - **Keeper Bot Reference:** Reference implementation for automated liquidation monitoring.
 - **Flash Loans:** Atomic ZK-safe flash borrowing of pUSD.
 
 ---
 
+---
+
 ## Further Reading
 
-- **[PROTOCOL.md](PROTOCOL.md)** — Complete protocol documentation: economic model, privacy design, circuit descriptions, ratio math, and liquidation mechanics
-- [Preprod Faucet](https://faucet.preprod.midnight.network) — Get testnet tNight tokens
-- [Midnight Documentation](https://docs.midnight.network/) — Developer guide
-- [Compact Language Reference](https://docs.midnight.network/compact) — Smart contract language
+- **[PROTOCOL.md](PROTOCOL.md)**: Complete protocol documentation: economic model, privacy design, circuit descriptions, ratio math, and liquidation mechanics
+- [Preprod Faucet](https://faucet.preprod.midnight.network): Get testnet tNight tokens
+- [Midnight Documentation](https://docs.midnight.network/): Developer guide
+- [Compact Language Reference](https://docs.midnight.network/compact): Smart contract language
 
 ---
 

@@ -194,7 +194,7 @@ const Landing: React.FC = () => {
 
                 <div style={{ ...fade(0.05), display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '5px 16px', borderRadius: '20px', marginBottom: '28px', background: 'rgba(200,214,232,0.05)', border: '1px solid rgba(200,214,232,0.12)', fontSize: '11px', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--moon-silver)' }}>
                     <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--moon-silver)', boxShadow: '0 0 6px var(--moon-silver)' }} />
-                    Live on Midnight Testnet — v1.0
+                    Live on Midnight Testnet: v1.0
                 </div>
 
                 <h1 style={{ ...fade(0.12), fontFamily: 'var(--font-heading)', fontSize: 'clamp(52px, 8.5vw, 96px)', fontWeight: 800, lineHeight: 0.95, letterSpacing: '-0.04em', marginBottom: '28px' }}>
@@ -205,7 +205,7 @@ const Landing: React.FC = () => {
 
                 <p style={{ ...fade(0.2), maxWidth: '540px', fontSize: '17px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: '0 auto 44px' }}>
                     A <strong style={{ color: 'var(--text-primary)', fontWeight: 500 }}>privacy-preserving collateralised debt protocol</strong> on the Midnight Network.
-                    Deposit tNight, mint pUSD, and let zero-knowledge proofs enforce every constraint — without exposing your position to anyone.
+                    Deposit tNight, mint pUSD, and let zero-knowledge proofs enforce every constraint: without exposing your position to anyone.
                 </p>
 
                 <div style={{ ...fade(0.28), display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -241,10 +241,10 @@ const Landing: React.FC = () => {
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                         {[
-                            { n: '01', icon: '🌑', iconBg: 'rgba(200,214,232,0.07)', iconBorder: 'rgba(200,214,232,0.15)', title: 'Lock tNight as Collateral', body: 'Deposit Midnight testnet tokens. Your collateral balance is stored exclusively in client-side LevelDB — never published to the ledger.' },
-                            { n: '02', icon: '❦', iconBg: 'rgba(0,229,255,0.07)', iconBorder: 'rgba(0,229,255,0.18)', title: 'Mint pUSD — A Real Token', body: 'Generate pUSD tokens against your collateral. A ZK proof certifies your ratio ≥ 150% without revealing how much tNight you hold. pUSD is fully transferable.' },
-                            { n: '03', icon: '↺', iconBg: 'rgba(108,99,255,0.07)', iconBorder: 'rgba(108,99,255,0.2)', title: 'Repay & Withdraw Freely', body: 'Repay debt and reclaim collateral at any time. Every operation enforces safety constraints in-circuit — no trusted intermediary.' },
-                            { n: '04', icon: '⚡', iconBg: 'rgba(255,92,92,0.07)', iconBorder: 'rgba(255,92,92,0.18)', title: 'Permissionless Liquidation', body: 'Anyone can liquidate a position whose ratio drops below 150%. Exactly 150% is protected — the circuit uses strict inequality.' },
+                            { n: '01', icon: '🌑', iconBg: 'rgba(200,214,232,0.07)', iconBorder: 'rgba(200,214,232,0.15)', title: 'Lock tNight as Collateral', body: 'Deposit Midnight testnet tokens. Your collateral balance is stored exclusively in client-side LevelDB: never published to the ledger.' },
+                            { n: '02', icon: '❦', iconBg: 'rgba(0,229,255,0.07)', iconBorder: 'rgba(0,229,255,0.18)', title: 'Mint pUSD: A Real Token', body: 'Generate pUSD tokens against your collateral. A ZK proof certifies your ratio ≥ 150% without revealing how much tNight you hold. pUSD is fully transferable.' },
+                            { n: '03', icon: '↺', iconBg: 'rgba(108,99,255,0.07)', iconBorder: 'rgba(108,99,255,0.2)', title: 'Repay & Withdraw Freely', body: 'Repay debt and reclaim collateral at any time. Every operation enforces safety constraints in-circuit: no trusted intermediary.' },
+                            { n: '04', icon: '⚡', iconBg: 'rgba(255,92,92,0.07)', iconBorder: 'rgba(255,92,92,0.18)', title: 'Permissionless Liquidation', body: 'Anyone can liquidate a position whose ratio drops below 150%. Exactly 150% is protected: the circuit uses strict inequality.' },
                         ].map(c => (
                             <LandingCard key={c.n}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '18px' }}>
@@ -262,10 +262,10 @@ const Landing: React.FC = () => {
                         <LandingCard>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '48px', alignItems: 'center' }}>
                                 <div>
-                                    <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--text-muted)' }}>05 — PRIVACY MODEL</span>
+                                    <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--text-muted)' }}>05: PRIVACY MODEL</span>
                                     <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '22px', fontWeight: 700, letterSpacing: '-0.02em', margin: '14px 0 12px' }}>Zero-Knowledge by Design</h3>
                                     <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: 1.7, marginBottom: '12px' }}>pUSD separates <em>proof of solvency</em> from <em>disclosure of position</em>. Your individual collateral and debt balances are ZK-proven witness values that never appear on the public ledger.</p>
-                                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.7, opacity: 0.7 }}>Unlike MakerDAO, Aave, or Compound — where every borrow is fully visible — pUSD makes your financial position unconditionally private while keeping aggregate protocol solvency publicly auditable.</p>
+                                    <p style={{ fontSize: '13px', color: 'var(--text-muted)', lineHeight: 1.7, opacity: 0.7 }}>Unlike MakerDAO, Aave, or Compound: where every borrow is fully visible: pUSD makes your financial position unconditionally private while keeping aggregate protocol solvency publicly auditable.</p>
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                     <div style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.1em', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '4px' }}>What's visible vs. hidden</div>
@@ -277,7 +277,7 @@ const Landing: React.FC = () => {
                                     </div>
                                     <ZKRow type="public" label="Publicly Auditable" sublabel="Total collateral · Total debt · Ratios" />
                                     <div style={{ marginTop: '8px', padding: '14px', borderRadius: '10px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                                        Proofs are generated locally. The proof server (Docker, port 6300) is stateless and receives only circuit inputs — never your raw private state.
+                                        Proofs are generated locally. The proof server (Docker, port 6300) is stateless and receives only circuit inputs: never your raw private state.
                                     </div>
                                 </div>
                             </div>
@@ -291,7 +291,7 @@ const Landing: React.FC = () => {
                 <div style={{ maxWidth: '1120px', margin: '0 auto', padding: '0 32px' }}>
                     <SectionLabel>Compact ZK Circuits</SectionLabel>
                     <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(32px,5vw,52px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: '14px' }}>Five circuits.<br />Every operation covered.</h2>
-                    <p style={{ fontSize: '16px', color: 'var(--text-secondary)', maxWidth: '440px', lineHeight: 1.7, marginBottom: '56px' }}>All protocol logic compiles to verifiable ZK circuits. No runtime trust — only cryptographic proof.</p>
+                    <p style={{ fontSize: '16px', color: 'var(--text-secondary)', maxWidth: '440px', lineHeight: 1.7, marginBottom: '56px' }}>All protocol logic compiles to verifiable ZK circuits. No runtime trust: only cryptographic proof.</p>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '14px', marginBottom: '64px' }}>
                         {[
@@ -313,7 +313,7 @@ const Landing: React.FC = () => {
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '18px' }}>
                         {[
-                            { n: 'INVARIANT 01', icon: '🔒', title: 'No Undercollateralised Minting', body: 'The mintPUSD circuit enforces that new debt cannot push your ratio below 150% — enforced in zero knowledge, cannot be bypassed.', formula: 'C × 100 ≥ D′ × 150' },
+                            { n: 'INVARIANT 01', icon: '🔒', title: 'No Undercollateralised Minting', body: 'The mintPUSD circuit enforces that new debt cannot push your ratio below 150%: enforced in zero knowledge, cannot be bypassed.', formula: 'C × 100 ≥ D′ × 150' },
                             { n: 'INVARIANT 02', icon: '◎', title: 'No Over-Withdrawal', body: 'Withdrawing collateral is only permitted if the remaining ratio still clears 150%. Branchless design reveals nothing about debt status.', formula: 'C′ × 100 ≥ D × 150' },
                             { n: 'INVARIANT 03', icon: '⚡', title: 'Strict Liquidation Threshold', body: 'Positions at exactly 150% are explicitly protected. Only strict undercollateralisation triggers the circuit.', formula: 'Vc × 100 < Vd × 150' },
                         ].map(g => (
@@ -362,7 +362,7 @@ const Landing: React.FC = () => {
                 <div style={{ maxWidth: '1120px', margin: '0 auto', padding: '0 32px' }}>
                     <SectionLabel>Honest Limitations</SectionLabel>
                     <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: 'clamp(32px,5vw,52px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: '14px' }}>What this protocol<br />does not do.</h2>
-                    <p style={{ fontSize: '16px', color: 'var(--text-secondary)', maxWidth: '440px', lineHeight: 1.7, marginBottom: '56px' }}>pUSD is a minimal viable implementation. These are the known constraints of v1.0 — all by design.</p>
+                    <p style={{ fontSize: '16px', color: 'var(--text-secondary)', maxWidth: '440px', lineHeight: 1.7, marginBottom: '56px' }}>pUSD is a minimal viable implementation. These are the known constraints of v1.0: all by design.</p>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                         {LIMITS.map(l => (
                             <div key={l.title} style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', padding: '22px 24px', borderRadius: '14px', border: '1px solid rgba(200,214,232,0.06)', background: 'var(--bg-primary)' }}>
@@ -612,10 +612,10 @@ const AppContent: React.FC = () => {
 
     return (
         <Routes location={location}>
-            {/* "/" — full-page landing, no sidebar */}
+            {/* "/": full-page landing, no sidebar */}
             <Route path="/" element={<Landing />} />
 
-            {/* App routes — wrapped in sidebar/topbar shell */}
+            {/* App routes: wrapped in sidebar/topbar shell */}
             <Route path="/setup" element={<AppShell><Setup /></AppShell>} />
             <Route path="/dashboard" element={<AppShell><Dashboard /></AppShell>} />
             <Route path="/position" element={<AppShell><Position /></AppShell>} />

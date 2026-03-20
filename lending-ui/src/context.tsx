@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Global State Context
+// pUSD Lending Protocol: Global State Context
 // Manages wallet, contract, and protocol state across all pages.
 
 import React, { createContext, useContext, useReducer, useCallback } from 'react';
@@ -174,7 +174,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const protocol = await api.getProtocolState();
             dispatch({ type: 'SET_PROTOCOL', payload: protocol });
         } catch {
-            // Ignore — may not have contract yet
+            // Ignore: may not have contract yet
         }
         dispatch({ type: 'SET_PROTOCOL_LOADING', payload: false });
     }, []);

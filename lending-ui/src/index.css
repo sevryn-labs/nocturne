@@ -87,13 +87,13 @@ body {
     radial-gradient(ellipse 40% 30% at 50% 10%, rgba(200, 214, 232, 0.03) 0%, transparent 50%);
 }
 
-/* Dense procedural starfield — 3 layers at different opacities/sizes */
+/* Dense procedural starfield: 3 layers at different opacities/sizes */
 .app-bg::after {
   content: "";
   position: absolute;
   inset: 0;
   background-image:
-    /* Layer 1 — tiny distant stars */
+    /* Layer 1: tiny distant stars */
     radial-gradient(0.8px 0.8px at 8%  12%, var(--star-bright) 100%, transparent),
     radial-gradient(0.8px 0.8px at 17% 34%, var(--star-dim)    100%, transparent),
     radial-gradient(0.8px 0.8px at 26% 58%, var(--star-bright) 100%, transparent),
@@ -104,7 +104,7 @@ body {
     radial-gradient(0.8px 0.8px at 74% 13%, var(--star-dim)    100%, transparent),
     radial-gradient(0.8px 0.8px at 82% 88%, var(--star-bright) 100%, transparent),
     radial-gradient(0.8px 0.8px at 93% 37%, var(--star-dim)    100%, transparent),
-    /* Layer 2 — mid stars */
+    /* Layer 2: mid stars */
     radial-gradient(1px 1px at 5%  55%, var(--star-bright) 100%, transparent),
     radial-gradient(1px 1px at 14% 7%,  var(--star-dim)    100%, transparent),
     radial-gradient(1px 1px at 22% 91%, var(--star-bright) 100%, transparent),
@@ -115,7 +115,7 @@ body {
     radial-gradient(1px 1px at 79% 64%, var(--star-dim)    100%, transparent),
     radial-gradient(1px 1px at 88% 18%, var(--star-bright) 100%, transparent),
     radial-gradient(1px 1px at 97% 82%, var(--star-dim)    100%, transparent),
-    /* Layer 3 — a few bright foreground stars */
+    /* Layer 3: a few bright foreground stars */
     radial-gradient(1.5px 1.5px at 11% 43%, rgba(255,255,255,0.85) 100%, transparent),
     radial-gradient(1.5px 1.5px at 35% 16%, rgba(200,214,232,0.7)  100%, transparent),
     radial-gradient(1.5px 1.5px at 64% 84%, rgba(255,255,255,0.85) 100%, transparent),
@@ -131,7 +131,7 @@ body {
 }
 
 /* ─────────────────────────────────────────────
-   MOON CRESCENT — top-right decorative element
+   MOON CRESCENT: top-right decorative element
 ───────────────────────────────────────────── */
 .moon-decoration {
   position: fixed;
@@ -149,7 +149,7 @@ body {
   filter: blur(0.5px);
 }
 
-/* Twinkling stars — sprinkle these as <span class="star"> inside .app-bg */
+/* Twinkling stars: sprinkle these as <span class="star"> inside .app-bg */
 .star {
   position: absolute;
   border-radius: 50%;
@@ -164,7 +164,7 @@ body {
   50%       { opacity: var(--twinkle-opacity, 0.7); transform: scale(1.2); }
 }
 
-/* Shooting star — add <div class="shooting-star"> to .app-bg for occasional effect */
+/* Shooting star: add <div class="shooting-star"> to .app-bg for occasional effect */
 .shooting-star {
   position: absolute;
   top: 18%;
@@ -485,7 +485,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ─────────────────────────────────────────────
-   MOON PHASE BADGE — decorative UI component
+   MOON PHASE BADGE: decorative UI component
    Usage: <div class="moon-phase-badge phase-waxing-crescent"></div>
 ───────────────────────────────────────────── */
 .moon-phase-badge {
@@ -730,7 +730,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ─────────────────────────────────────────────
-   LOADING SPINNER — lunar orbit style
+   LOADING SPINNER: lunar orbit style
 ───────────────────────────────────────────── */
 .loading-orbit {
   width: 32px;

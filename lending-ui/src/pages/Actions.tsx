@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Actions Page
+// pUSD Lending Protocol: Actions Page
 // Card-based interface for all lending operations.
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -20,57 +20,57 @@ const ACTION_CARDS: {
   accentBorder: string;
   tooltip: string;
 }[] = [
-  {
-    key: 'deposit',
-    label: 'Deposit Collateral',
-    desc: 'Lock tNight to enable borrowing and improve your health factor.',
-    icon: '↓',
-    accentColor: 'var(--status-success)',
-    accentBg: 'rgba(76,175,80,0.07)',
-    accentBorder: 'rgba(76,175,80,0.2)',
-    tooltip: 'Locking more collateral improves your health factor and allows you to mint more pUSD.',
-  },
-  {
-    key: 'mint',
-    label: 'Mint pUSD',
-    desc: 'Borrow synthetic credit units against your locked collateral.',
-    icon: '✦',
-    accentColor: 'var(--accent-secondary)',
-    accentBg: 'rgba(0,229,255,0.06)',
-    accentBorder: 'rgba(0,229,255,0.18)',
-    tooltip: 'Minting pUSD increases your debt. Ensure your ratio stays above 150%.',
-  },
-  {
-    key: 'repay',
-    label: 'Repay pUSD',
-    desc: 'Reduce your debt and bring your position back to safety.',
-    icon: '↺',
-    accentColor: 'var(--accent-primary)',
-    accentBg: 'rgba(108,99,255,0.07)',
-    accentBorder: 'rgba(108,99,255,0.2)',
-    tooltip: 'Repaying pUSD removes debt from your position, making it safer from liquidation.',
-  },
-  {
-    key: 'withdraw',
-    label: 'Withdraw Collateral',
-    desc: 'Reclaim tNight while keeping your ratio above 150%.',
-    icon: '↑',
-    accentColor: 'var(--status-warning)',
-    accentBg: 'rgba(255,184,77,0.07)',
-    accentBorder: 'rgba(255,184,77,0.2)',
-    tooltip: 'You can only withdraw collateral if your remaining ratio stays above 150%.',
-  },
-  {
-    key: 'liquidate',
-    label: 'Liquidate',
-    desc: 'Close an undercollateralised position and claim the locked collateral.',
-    icon: '⚡',
-    accentColor: 'var(--status-error)',
-    accentBg: 'rgba(255,92,92,0.06)',
-    accentBorder: 'rgba(255,92,92,0.18)',
-    tooltip: "Liquidation maintains protocol health. Requires repaying the victim's full debt.",
-  },
-];
+    {
+      key: 'deposit',
+      label: 'Deposit Collateral',
+      desc: 'Lock tNight to enable borrowing and improve your health factor.',
+      icon: '↓',
+      accentColor: 'var(--status-success)',
+      accentBg: 'rgba(76,175,80,0.07)',
+      accentBorder: 'rgba(76,175,80,0.2)',
+      tooltip: 'Locking more collateral improves your health factor and allows you to mint more pUSD.',
+    },
+    {
+      key: 'mint',
+      label: 'Mint pUSD',
+      desc: 'Borrow synthetic credit units against your locked collateral.',
+      icon: '✦',
+      accentColor: 'var(--accent-secondary)',
+      accentBg: 'rgba(0,229,255,0.06)',
+      accentBorder: 'rgba(0,229,255,0.18)',
+      tooltip: 'Minting pUSD increases your debt. Ensure your ratio stays above 150%.',
+    },
+    {
+      key: 'repay',
+      label: 'Repay pUSD',
+      desc: 'Reduce your debt and bring your position back to safety.',
+      icon: '↺',
+      accentColor: 'var(--accent-primary)',
+      accentBg: 'rgba(108,99,255,0.07)',
+      accentBorder: 'rgba(108,99,255,0.2)',
+      tooltip: 'Repaying pUSD removes debt from your position, making it safer from liquidation.',
+    },
+    {
+      key: 'withdraw',
+      label: 'Withdraw Collateral',
+      desc: 'Reclaim tNight while keeping your ratio above 150%.',
+      icon: '↑',
+      accentColor: 'var(--status-warning)',
+      accentBg: 'rgba(255,184,77,0.07)',
+      accentBorder: 'rgba(255,184,77,0.2)',
+      tooltip: 'You can only withdraw collateral if your remaining ratio stays above 150%.',
+    },
+    {
+      key: 'liquidate',
+      label: 'Liquidate',
+      desc: 'Close an undercollateralised position and claim the locked collateral.',
+      icon: '⚡',
+      accentColor: 'var(--status-error)',
+      accentBg: 'rgba(255,92,92,0.06)',
+      accentBorder: 'rgba(255,92,92,0.18)',
+      tooltip: "Liquidation maintains protocol health. Requires repaying the victim's full debt.",
+    },
+  ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -163,9 +163,9 @@ export const Actions: React.FC = () => {
     let newDebt = debt;
 
     switch (selectedAction) {
-      case 'deposit':  newCollateral = collateral + amtBig; break;
-      case 'mint':     newDebt = debt + amtBig; break;
-      case 'repay':    newDebt = debt - amtBig; if (newDebt < 0n) newDebt = 0n; break;
+      case 'deposit': newCollateral = collateral + amtBig; break;
+      case 'mint': newDebt = debt + amtBig; break;
+      case 'repay': newDebt = debt - amtBig; if (newDebt < 0n) newDebt = 0n; break;
       case 'withdraw': newCollateral = collateral - amtBig; if (newCollateral < 0n) newCollateral = 0n; break;
       default: return null;
     }
@@ -323,7 +323,7 @@ export const Actions: React.FC = () => {
           {state.actionError && <AlertBox type="error">{state.actionError}</AlertBox>}
           {state.lastTxHash && (
             <AlertBox type="success">
-              Transaction confirmed — <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{state.lastTxHash.slice(0, 16)}…</span>
+              Transaction confirmed: <span style={{ fontFamily: 'monospace', fontSize: '12px' }}>{state.lastTxHash.slice(0, 16)}…</span>
             </AlertBox>
           )}
 
@@ -332,10 +332,10 @@ export const Actions: React.FC = () => {
               {/* Amount input */}
               <div className="form-group">
                 <label className="form-label">
-                  {selectedAction === 'deposit'  ? 'tNight to Lock'
-                  : selectedAction === 'withdraw' ? 'tNight to Reclaim'
-                  : selectedAction === 'mint'     ? 'pUSD to Mint'
-                  :                                 'pUSD to Repay'}
+                  {selectedAction === 'deposit' ? 'tNight to Lock'
+                    : selectedAction === 'withdraw' ? 'tNight to Reclaim'
+                      : selectedAction === 'mint' ? 'pUSD to Mint'
+                        : 'pUSD to Repay'}
                 </label>
                 <input
                   className="form-input"
@@ -346,7 +346,7 @@ export const Actions: React.FC = () => {
                   autoFocus
                   style={{ fontSize: '20px', fontFamily: 'monospace' }}
                 />
-                {selectedAction === 'repay'    && <FieldHint>Available debt: {debt.toLocaleString()} pUSD</FieldHint>}
+                {selectedAction === 'repay' && <FieldHint>Available debt: {debt.toLocaleString()} pUSD</FieldHint>}
                 {selectedAction === 'withdraw' && <FieldHint>Available collateral: {collateral.toLocaleString()} tN</FieldHint>}
               </div>
 

@@ -1,11 +1,11 @@
-# pUSD Lending Protocol — Architecture & Mechanics
+# pUSD Lending Protocol: Architecture & Mechanics
 
 > A privacy-preserving, collateralised synthetic stablecoin protocol built on
 > the Midnight Network using Compact smart contracts and midnight-js tooling.
 > Conceptually equivalent to MakerDAO/Liquity, optimised for clarity, oracle-driven
 > risk management, and ZK-based privacy.
 >
-> **Version 3.0.0** — Oracle prices, governance circuits, insurance fund, pause mechanism.
+> **Version 3.0.0**: Oracle prices, governance circuits, insurance fund, pause mechanism.
 
 ---
 
@@ -13,7 +13,7 @@
 
 1. [Protocol Overview](#1-protocol-overview)
 2. [Economic Model](#2-economic-model)
-3. [Privacy Model — Why Each Piece of Data is Public or Private](#3-privacy-model)
+3. [Privacy Model: Why Each Piece of Data is Public or Private](#3-privacy-model)
 4. [State Design](#4-state-design)
 5. [Contract Circuits](#5-contract-circuits)
 6. [Collateral Ratio Math](#6-collateral-ratio-math)
@@ -105,7 +105,7 @@ and `withdrawCollateral`.
 |                    | the contract holds enough tNight to cover all withdrawals.       |
 | `totalDebt`        | Needed to verify the protocol hasn't issued unbacked pUSD.       |
 | `liquidationRatio` | Must be transparent so users can evaluate risk parameters.       |
-| `mintingRatio`     | Same rationale — a hidden ratio would be unacceptably opaque.    |
+| `mintingRatio`     | Same rationale: a hidden ratio would be unacceptably opaque.    |
 | `oraclePrice`      | Users must know the reference price to evaluate their position.  |
 | `oracleTimestamp`  | Required to assess oracle freshness and staleness risk.          |
 | `debtCeiling`      | Transparent capacity limit for protocol-level risk assessment.   |
@@ -145,14 +145,14 @@ actual collateral/debt values to the verifier or to any on-chain observer.
 
 ### Identity privacy
 
-Borrower identity is pseudonymous — linked only to a Zswap public key, not to
+Borrower identity is pseudonymous: linked only to a Zswap public key, not to
 any real-world identity. The protocol never requires KYC or wallet linkage.
 
 ### Liquidation trade-off
 
 Liquidation is the one case where individual position values must be revealed:
 the liquidator provides the victim's collateral + debt as circuit arguments.
-This is unavoidable (the circuit must verify the ratio to allow liquidation) —
+This is unavoidable (the circuit must verify the ratio to allow liquidation):
 but only the liquidator ever knows the exact values. This mirrors MakerDAO's
 "anyone can call liquidation" model.
 
@@ -255,13 +255,13 @@ Sets protocol parameters once at deploy time. Both ratios start at 150%.
 export circuit depositCollateral(amount: Uint<64>): [] {
   assert(amount > 0, "Deposit amount must be positive");
 
-  // Read private state — never leaves the ZK proof
+  // Read private state: never leaves the ZK proof
   const myCollateral = collateralAmount();
 
   // Prove no overflow on the private running balance
   const _ = myCollateral + amount;
 
-  // Update public aggregate — `disclose` is required because `amount`
+  // Update public aggregate: `disclose` is required because `amount`
   // is a circuit argument (treated as witness-derived by the compiler)
   totalCollateral.increment(disclose(amount) as Uint<16>);
 }
@@ -409,7 +409,7 @@ All governance circuits are admin-callable (Phase 1: caller restriction at API l
 
 ### Read-Only State
 
-All v3 ledger values (`oraclePrice`, `oracleTimestamp`, `debtCeiling`, `insuranceFund`, `minDebt`, `liquidationPenalty`, `paused`) are `export ledger` fields, queryable directly via the Midnight indexer / public state API. No dedicated query circuits are needed — this keeps the deployment within the block size limit.
+All v3 ledger values (`oraclePrice`, `oracleTimestamp`, `debtCeiling`, `insuranceFund`, `minDebt`, `liquidationPenalty`, `paused`) are `export ledger` fields, queryable directly via the Midnight indexer / public state API. No dedicated query circuits are needed: this keeps the deployment within the block size limit.
 
 ---
 
@@ -496,7 +496,7 @@ This incentivises keeper participation while building protocol reserves.
 
 The oracle price is updated via the `updateOraclePrice(newPrice, blockHeight)` admin circuit:
 
-- **Price format:** 4-decimal precision — `$1.00 = 10000`, `$0.50 = 5000`, `$2.50 = 25000`
+- **Price format:** 4-decimal precision: `$1.00 = 10000`, `$0.50 = 5000`, `$2.50 = 25000`
 - **Block height:** Must be strictly increasing (prevents replays)
 - **Staleness:** `oracleStalenessLimit` defines the maximum blocks between updates before operations should be considered risky
 
@@ -640,7 +640,7 @@ Because Midnight circuits cannot self-execute or monitor global state automatica
 | Governance bounds checking      | Range assertions in all admin circuits (e.g., 110≤ratio≤300) |
 | Borrower identity privacy       | Private state never touches public ledger        |
 | Debt amount privacy             | Witness-only; proven in ZK, not revealed         |
-| No information leakage from branches | Branchless design — no `if` on private values |
+| No information leakage from branches | Branchless design: no `if` on private values |
 | Value disclosure is explicit    | `disclose()` marks which values may be revealed  |
 
 ---
@@ -649,19 +649,19 @@ Because Midnight circuits cannot self-execute or monitor global state automatica
 
 v3 delivers a production-grade foundation. Remaining items for full mainnet readiness:
 
-- ✅ **Oracle Price Feed** — Implemented in v3
-- ✅ **Governance Circuits** — 8 admin circuits for live parameter tuning
-- ✅ **Debt Ceiling & Min Debt** — System-wide caps and dust prevention
-- ✅ **Insurance Fund** — On-chain protocol reserve
-- ✅ **Pause Mechanism** — Emergency circuit with selective operation blocking
-- **On-chain Admin Access Control** — Phase 2: verify caller == admin key in circuits
-- **Multi-sig Governance** — Phase 2: N-of-M key holder approval
-- **Timelock** — Phase 3: 48h delay on parameter changes
-- **Decentralized Oracles** — Phase 3: ZK-bridged price feeds
-- **Redemption Mechanism** — Direct pUSD-to-collateral redemption at $1
-- **Stability Fee** — Dynamic interest rate for peg maintenance
-- **Keeper Bot Reference** — Automated liquidation monitoring
-- **Flash Loans** — Atomic ZK-safe flash borrowing
+- ✅ **Oracle Price Feed**: Implemented in v3
+- ✅ **Governance Circuits**: 8 admin circuits for live parameter tuning
+- ✅ **Debt Ceiling & Min Debt**: System-wide caps and dust prevention
+- ✅ **Insurance Fund**: On-chain protocol reserve
+- ✅ **Pause Mechanism**: Emergency circuit with selective operation blocking
+- **On-chain Admin Access Control**: Phase 2: verify caller == admin key in circuits
+- **Multi-sig Governance**: Phase 2: N-of-M key holder approval
+- **Timelock**: Phase 3: 48h delay on parameter changes
+- **Decentralized Oracles**: Phase 3: ZK-bridged price feeds
+- **Redemption Mechanism**: Direct pUSD-to-collateral redemption at $1
+- **Stability Fee**: Dynamic interest rate for peg maintenance
+- **Keeper Bot Reference**: Automated liquidation monitoring
+- **Flash Loans**: Atomic ZK-safe flash borrowing
 
 ---
 
@@ -734,7 +734,7 @@ cd contract && npm run compact && cd ..
 cd contract && npm test
 ```
 
-Tests run against the in-memory `LendingSimulator` — no Midnight node needed.
+Tests run against the in-memory `LendingSimulator`: no Midnight node needed.
 
 ### Run Web UI + API (Recommended)
 
@@ -783,7 +783,7 @@ cd lending-cli && npm run standalone
 ```
 
 Launches local Docker containers (indexer, node, proof server) automatically.
-Uses the genesis seed with pre-minted tNight — no faucet needed.
+Uses the genesis seed with pre-minted tNight: no faucet needed.
 
 ---
 

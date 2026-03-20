@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Setup Page
+// pUSD Lending Protocol: Setup Page
 // Wallet initialization and contract deployment.
 
 import React, { useState } from 'react';
@@ -375,7 +375,7 @@ export const Setup: React.FC = () => {
                             {state.walletLoading && (
                                 <p style={styles.syncNote}>
                                     <span>🌑</span>
-                                    Syncing with the Midnight network — this usually takes ~30s
+                                    Syncing with the Midnight network: this usually takes ~30s
                                 </p>
                             )}
                         </>

@@ -133,8 +133,8 @@ When this evaluates to true, the protocol exposes the position to external liqui
 
 Beyond the core collateral ratio, v3 enforces:
 
-1. **Debt Ceiling:** $\Sigma D_i + D_{new} \le D_{ceiling}$ — system-wide cap on pUSD issuance.
-2. **Minimum Debt:** $D_i \ge D_{min}$ — prevents dust positions uneconomical to liquidate.
+1. **Debt Ceiling:** $\Sigma D_i + D_{new} \le D_{ceiling}$: system-wide cap on pUSD issuance.
+2. **Minimum Debt:** $D_i \ge D_{min}$: prevents dust positions uneconomical to liquidate.
 3. **Pause Gate:** Operations requiring risk evaluation are gated by `paused == 0`.
 
 ---
@@ -279,7 +279,7 @@ Governance circuits for live parameter tuning (Phase 1: API-level caller restric
 - `updateLiquidationPenalty(newPenalty)`: Bounded to 500–2500 bps.
 - `updateStalenessLimit(newLimit)`: Bounded to 10–10000 blocks.
 - `setPaused(pauseState)`: Emergency halt (0=active, 1=paused).
-- `fundInsurance(amount)`: Open to anyone — grows protocol reserves.
+- `fundInsurance(amount)`: Open to anyone: grows protocol reserves.
 
 ### 10.3 Token Circuits
 
@@ -342,15 +342,15 @@ The protocol, while achieving production-grade status in v3, exhibits specific i
 
 The v3 implementation of pUSD establishes a production-grade foundation for privacy-preserving DeFi. Key extensions on the roadmap include:
 
-- ~~**Oracle Price Feed:**~~ ✅ Implemented in v3 — oracle-adjusted ratio calculations with staleness protection.
-- ~~**Governance Circuits:**~~ ✅ Implemented in v3 — 8 bounded admin circuits for live parameter tuning.
-- ~~**Insurance Fund:**~~ ✅ Implemented in v3 — on-chain Counter with voluntary funding.
-- ~~**Pause Mechanism:**~~ ✅ Implemented in v3 — selective operation blocking with risk-reducing exemptions.
-- ~~**Debt Ceiling & Min Debt:**~~ ✅ Implemented in v3 — system capacity controls and dust prevention.
-- **On-chain Admin Access Control:** Phase 2 — `callerAddress()` verification in governance circuits.
-- **Multi-sig Governance:** Phase 2 — N-of-M key holder approval for parameter changes.
-- **Timelock:** Phase 3 — 48h delay on parameter changes before activation.
-- **Decentralized Oracles:** Phase 3 — ZK-bridged price feeds from DIA/Chainlink oracle networks.
+- ~~**Oracle Price Feed:**~~ ✅ Implemented in v3: oracle-adjusted ratio calculations with staleness protection.
+- ~~**Governance Circuits:**~~ ✅ Implemented in v3: 8 bounded admin circuits for live parameter tuning.
+- ~~**Insurance Fund:**~~ ✅ Implemented in v3: on-chain Counter with voluntary funding.
+- ~~**Pause Mechanism:**~~ ✅ Implemented in v3: selective operation blocking with risk-reducing exemptions.
+- ~~**Debt Ceiling & Min Debt:**~~ ✅ Implemented in v3: system capacity controls and dust prevention.
+- **On-chain Admin Access Control:** Phase 2: `callerAddress()` verification in governance circuits.
+- **Multi-sig Governance:** Phase 2: N-of-M key holder approval for parameter changes.
+- **Timelock:** Phase 3: 48h delay on parameter changes before activation.
+- **Decentralized Oracles:** Phase 3: ZK-bridged price feeds from DIA/Chainlink oracle networks.
 - **Redemption Mechanism:** Direct pUSD-to-collateral redemption at $1 from riskiest vaults.
 - **Stability Fee:** A dynamically adjustable interest rate mechanism for peg maintenance through natural arbitrage loops.
 - **Zero-Knowledge Flash Loans:** Expanding the atomic composability of Midnight's execution context to support flash-borrowing of pUSD, relying intrinsically on the ultimate state-reversion SNARK proof protections.

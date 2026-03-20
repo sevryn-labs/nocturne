@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — My Position Page
+// pUSD Lending Protocol: My Position Page
 // Shows private position details and health metrics.
 
 import React, { useEffect } from 'react';

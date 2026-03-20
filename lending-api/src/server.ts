@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Express REST API Server
+// pUSD Lending Protocol: Express REST API Server
 //
 // Exposes the LendingService as HTTP endpoints on localhost:3001.
 // The frontend calls these endpoints instead of interacting with the

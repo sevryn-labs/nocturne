@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — API Client
+// pUSD Lending Protocol: API Client
 // Typed HTTP client for the lending-api REST server.
 
 const API_BASE = '/api';
@@ -69,7 +69,7 @@ export interface ProtocolState {
     totalDebt: string;
     liquidationRatio: string;
     mintingRatio: string;
-    /** pUSD token total supply — always equals totalDebt */
+    /** pUSD token total supply: always equals totalDebt */
     totalSupply: string;
 }
 

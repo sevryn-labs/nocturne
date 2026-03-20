@@ -1,4 +1,4 @@
-// pUSD Lending Protocol — Interactive CLI
+// pUSD Lending Protocol: Interactive CLI
 //
 // Provides a menu-driven terminal interface for all five lending operations
 // plus protocol state and user position views.
@@ -20,7 +20,7 @@ import * as api from './api.js';
 
 let logger: Logger;
 
-// Standalone genesis seed — pre-funded on local dev node only
+// Standalone genesis seed: pre-funded on local dev node only
 const GENESIS_MINT_WALLET_SEED = '0000000000000000000000000000000000000000000000000000000000000001';
 
 // ─── Display Constants ────────────────────────────────────────────────────────
@@ -238,7 +238,7 @@ const showError = (label: string, e: unknown): void => {
     }
   }
   if (msg.toLowerCase().includes('dust') || msg.toLowerCase().includes('no dust')) {
-    console.log('    Insufficient DUST for fees — use option [3] to monitor your balance.');
+    console.log('    Insufficient DUST for fees: use option [3] to monitor your balance.');
   }
   console.log('');
 };
@@ -351,7 +351,7 @@ const lendingLoop = async (
           const tx = await api.withStatus(`Depositing ${amount.toLocaleString()} tNight`, () =>
             api.depositCollateral(lendingContract, providers, amount),
           );
-          console.log(`  ✓ Deposited — tx ${tx.txId} in block ${tx.blockHeight}\n`);
+          console.log(`  ✓ Deposited: tx ${tx.txId} in block ${tx.blockHeight}\n`);
           await displayPosition(providers, contractAddress);
         } catch (e) {
           showError('Deposit', e);
@@ -363,13 +363,32 @@ const lendingLoop = async (
       case '2': {
         // Show current position first to help user choose a safe mint amount
         await displayPosition(providers, contractAddress);
+
+        // Notify user about minimum debt threshold
+        try {
+          const state = await api.getProtocolState(providers, contractAddress as any);
+          const pos = await api.getPosition(providers, contractAddress as any);
+          if (state) {
+            const minMint = pos.debtAmount >= state.minDebt
+              ? 1n
+              : state.minDebt - pos.debtAmount;
+            console.log(`  ⓘ  Minimum vault debt: ${state.minDebt.toLocaleString()} pUSD`);
+            if (pos.debtAmount === 0n) {
+              console.log(`     You must mint at least ${minMint.toLocaleString()} pUSD on your first mint.`);
+            } else if (pos.debtAmount < state.minDebt) {
+              console.log(`     Your current debt is ${pos.debtAmount.toLocaleString()} pUSD: you need to mint at least ${minMint.toLocaleString()} more pUSD.`);
+            }
+            console.log('');
+          }
+        } catch { /* non-critical: continue to prompt */ }
+
         const amount = await promptAmount(rli, 'pUSD to mint');
         if (!amount) break;
         try {
           const tx = await api.withStatus(`Minting ${amount.toLocaleString()} pUSD`, () =>
             api.mintPUSD(lendingContract, providers, amount),
           );
-          console.log(`  ✓ Minted — tx ${tx.txId} in block ${tx.blockHeight}`);
+          console.log(`  ✓ Minted: tx ${tx.txId} in block ${tx.blockHeight}`);
           // Show updated pUSD balance for verification
           try {
             const balances = await api.getWalletBalances(providers, walletCtx, contractAddress as any);
@@ -393,7 +412,7 @@ const lendingLoop = async (
           const tx = await api.withStatus(`Repaying ${amount.toLocaleString()} pUSD`, () =>
             api.repayPUSD(lendingContract, providers, amount),
           );
-          console.log(`  ✓ Repaid — tx ${tx.txId} in block ${tx.blockHeight}\n`);
+          console.log(`  ✓ Repaid: tx ${tx.txId} in block ${tx.blockHeight}\n`);
           await displayPosition(providers, contractAddress);
         } catch (e) {
           showError('Repay', e);
@@ -410,7 +429,7 @@ const lendingLoop = async (
           const tx = await api.withStatus(`Withdrawing ${amount.toLocaleString()} tNight`, () =>
             api.withdrawCollateral(lendingContract, providers, amount),
           );
-          console.log(`  ✓ Withdrawn — tx ${tx.txId} in block ${tx.blockHeight}\n`);
+          console.log(`  ✓ Withdrawn: tx ${tx.txId} in block ${tx.blockHeight}\n`);
           await displayPosition(providers, contractAddress);
         } catch (e) {
           showError('Withdraw', e);
@@ -439,11 +458,11 @@ const lendingLoop = async (
         const ratio = (victimCollateral * oraclePrice * 100n) / (victimDebt * 10000n);
         const liqRatio = 150n; // default
         if (ratio >= liqRatio) {
-          console.log(`  ✗ Position ratio is ${ratio}% at oracle price — NOT liquidatable (must be < ${liqRatio}%)\n`);
+          console.log(`  ✗ Position ratio is ${ratio}% at oracle price: NOT liquidatable (must be < ${liqRatio}%)\n`);
           break;
         }
 
-        console.log(`  Position ratio: ${ratio}% — LIQUIDATABLE ✓`);
+        console.log(`  Position ratio: ${ratio}%: LIQUIDATABLE ✓`);
         const confirm = await rli.question('  Confirm liquidation? [y/N]: ');
         if (confirm.trim().toLowerCase() !== 'y') {
           console.log('  Cancelled.\n');
@@ -454,7 +473,7 @@ const lendingLoop = async (
           const tx = await api.withStatus('Liquidating position', () =>
             api.liquidate(lendingContract, victimCollateral, victimDebt),
           );
-          console.log(`  ✓ Liquidated — tx ${tx.txId} in block ${tx.blockHeight}`);
+          console.log(`  ✓ Liquidated: tx ${tx.txId} in block ${tx.blockHeight}`);
           console.log(`  Received ${victimCollateral.toLocaleString()} tNight\n`);
           await displayProtocolState(providers, contractAddress);
         } catch (e) {
@@ -505,7 +524,7 @@ const lendingLoop = async (
           const tx = await api.withStatus(`Transferring ${amount.toLocaleString()} pUSD`, () =>
             api.transferPUSD(lendingContract, toPublicKeyHex, amount),
           );
-          console.log(`  ✓ Transferred — tx ${tx.txId} in block ${tx.blockHeight}\n`);
+          console.log(`  ✓ Transferred: tx ${tx.txId} in block ${tx.blockHeight}\n`);
           await displayWalletBalances(providers, walletCtx, contractAddress);
         } catch (e) {
           showError('Transfer', e);

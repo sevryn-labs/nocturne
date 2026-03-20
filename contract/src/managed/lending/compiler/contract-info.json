@@ -1,8 +1,12 @@
 {
+  "compiler-version": "0.30.0",
+  "language-version": "0.22.0",
+  "runtime-version": "0.15.0",
   "circuits": [
     {
       "name": "balanceOf",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "account",
@@ -29,6 +33,7 @@
     {
       "name": "allowance",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "owner",
@@ -71,6 +76,7 @@
     {
       "name": "transfer",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "to",
@@ -103,6 +109,7 @@
     {
       "name": "approve",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "spender",
@@ -135,6 +142,7 @@
     {
       "name": "transferFrom",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "tokenOwner",
@@ -183,6 +191,7 @@
     {
       "name": "depositCollateral",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "amount",
@@ -201,6 +210,7 @@
     {
       "name": "mintPUSD",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "amount",
@@ -219,6 +229,7 @@
     {
       "name": "repayPUSD",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "amount",
@@ -237,6 +248,7 @@
     {
       "name": "withdrawCollateral",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "amount",
@@ -255,6 +267,7 @@
     {
       "name": "liquidate",
       "pure": false,
+      "proof": true,
       "arguments": [
         {
           "name": "victimCollateral",
