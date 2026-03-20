@@ -1,6 +1,6 @@
 # pUSD Lending Protocol
 
-[![Generic badge](https://img.shields.io/badge/Compact%20Toolchain-0.28.0-1abc9c.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/midnight--js-3.0.0-blueviolet.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/wallet--sdk--facade-1.0.0-blue.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Tests-100%2B%20passing-brightgreen.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Version-3.0.0-orange.svg)](https://shields.io/)
+[![Generic badge](https://img.shields.io/badge/Compact%20Toolchain-0.28.0-1abc9c.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/midnight--js-3.0.0-blueviolet.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/wallet--sdk--facade-1.0.0-blue.svg)](https://shields.io/) [![Generic badge](https://img.shields.io/badge/Version-3.0.0-orange.svg)](https://shields.io/)
 
 A **privacy-preserving collateralised lending protocol** built on the [Midnight Network](https://midnight.network). Deposit tNight as collateral, mint pUSD synthetic stablecoins, and maintain positions privately via zero-knowledge proofs: individual debt and collateral amounts are never exposed on-chain.
 
@@ -731,8 +731,6 @@ v3 delivers a production-grade foundation. Remaining items for full mainnet read
 - **Stability Fee:** Dynamic interest rate adjustable via governance to maintain the $1 peg.
 - **Keeper Bot Reference:** Reference implementation for automated liquidation monitoring.
 - **Flash Loans:** Atomic ZK-safe flash borrowing of pUSD.
-
----
 
 ---
 
