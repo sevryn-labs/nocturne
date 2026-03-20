@@ -1,26 +1,6 @@
 {
   "circuits": [
     {
-      "name": "decimals",
-      "pure": false,
-      "arguments": [
-      ],
-      "result-type": {
-        "type-name": "Uint",
-        "maxval": 255
-      }
-    },
-    {
-      "name": "totalSupply",
-      "pure": false,
-      "arguments": [
-      ],
-      "result-type": {
-        "type-name": "Uint",
-        "maxval": 340282366920938463463374607431768211455
-      }
-    },
-    {
       "name": "balanceOf",
       "pure": false,
       "arguments": [

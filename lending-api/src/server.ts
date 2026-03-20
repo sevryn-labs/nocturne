@@ -245,6 +245,68 @@ app.post('/api/token/transfer-from', asyncHandler(async (req, res) => {
     sendJson(res, result);
 }));
 
+// ─── v3 Admin / Governance Endpoints ─────────────────────────────────────────
+
+app.post('/api/admin/oracle-price', asyncHandler(async (req, res) => {
+    const { price, blockHeight } = req.body;
+    if (!price || !blockHeight) {
+        sendJson(res, { error: 'price and blockHeight are required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.updateOraclePrice(BigInt(price), BigInt(blockHeight));
+    sendJson(res, result);
+}));
+
+app.post('/api/admin/minting-ratio', asyncHandler(async (req, res) => {
+    const { ratio } = req.body;
+    if (!ratio) {
+        sendJson(res, { error: 'ratio is required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.updateMintingRatio(BigInt(ratio));
+    sendJson(res, result);
+}));
+
+app.post('/api/admin/liquidation-ratio', asyncHandler(async (req, res) => {
+    const { ratio } = req.body;
+    if (!ratio) {
+        sendJson(res, { error: 'ratio is required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.updateLiquidationRatio(BigInt(ratio));
+    sendJson(res, result);
+}));
+
+app.post('/api/admin/debt-ceiling', asyncHandler(async (req, res) => {
+    const { ceiling } = req.body;
+    if (!ceiling) {
+        sendJson(res, { error: 'ceiling is required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.updateDebtCeiling(BigInt(ceiling));
+    sendJson(res, result);
+}));
+
+app.post('/api/admin/pause', asyncHandler(async (req, res) => {
+    const { state: pauseState } = req.body;
+    if (pauseState === undefined || pauseState === null) {
+        sendJson(res, { error: 'state (0 or 1) is required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.setPaused(BigInt(pauseState));
+    sendJson(res, result);
+}));
+
+app.post('/api/admin/fund-insurance', asyncHandler(async (req, res) => {
+    const { amount } = req.body;
+    if (!amount) {
+        sendJson(res, { error: 'amount is required', errorType: 'VALIDATION' }, 400);
+        return;
+    }
+    const result = await service.fundInsurance(BigInt(amount));
+    sendJson(res, result);
+}));
+
 // ─── Start Server ────────────────────────────────────────────────────────────
 
 app.listen(PORT, () => {
@@ -266,4 +328,11 @@ app.listen(PORT, () => {
     console.log(`  POST /api/token/transfer`);
     console.log(`  POST /api/token/approve`);
     console.log(`  POST /api/token/transfer-from`);
+    console.log(`  --- v3 Admin ---`);
+    console.log(`  POST /api/admin/oracle-price`);
+    console.log(`  POST /api/admin/minting-ratio`);
+    console.log(`  POST /api/admin/liquidation-ratio`);
+    console.log(`  POST /api/admin/debt-ceiling`);
+    console.log(`  POST /api/admin/pause`);
+    console.log(`  POST /api/admin/fund-insurance`);
 });

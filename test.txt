@@ -1,5 +1,5 @@
 seed: 57bb166cb6bbf3a6cb5e93a26043e3e2d3c830b63b85286fe97619456a2a23f2
-contract address: ea09730b5443f5fd5931ea56f5047aa3b6fe8118ff6ced367d42b4c3ca4b90d0
+contract address: 476b01ddf88b12c25f43b1bf99a28bbe38d9d9ec342f6d45f5c9dd028056b679
 unshielded address: mn_addr_preprod16t47na8kptxkf9tsqj6f39hcru6whylchn7z96vr6zll0vcd8aaskgmm5n
 coin public key: 02bdacaa35ac33848d6abccea858f6691a35c8d58954ef136c9f2b6bcfd046da
 
@@ -7,3 +7,8 @@ seed: 2b477c42d95b5eb49222b25f9e5267c44cb15bef9646f086248bff24f43e727f
 contract address: 32ce99081d888084faaea4235ccf103f63b3f60d4d2e6e01ab45ee4f08a539b1
 unshielded address: mn_addr_preprod1jxvgskfh0yfhcscg7wfrv7gr3phwaku6g2ea0z0fsvzv6f0p9myqdsp3qp
 coin public key: a37eb5b9fdb93ae70aa054509faeb24cecec645c86d9781ae39fb30e66238753
+
+
+
+1. everytime i re run the cli, my private position is vanished but the public ledger still holds the tokens
+2. prompt the users by default that there is a minimum threshold for minting pusd

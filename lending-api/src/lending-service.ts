@@ -332,6 +332,15 @@ export class LendingService {
             mintingRatio: lstate.mintingRatio as bigint,
             // _totalSupply always equals totalDebt (supply == debt invariant)
             totalSupply: (lstate._totalSupply as bigint | undefined) ?? 0n,
+            // v3 fields
+            oraclePrice: (lstate.oraclePrice as bigint | undefined) ?? 10000n,
+            oracleTimestamp: (lstate.oracleTimestamp as bigint | undefined) ?? 0n,
+            oracleStalenessLimit: (lstate.oracleStalenessLimit as bigint | undefined) ?? 1000n,
+            debtCeiling: (lstate.debtCeiling as bigint | undefined) ?? 10000000n,
+            liquidationPenalty: (lstate.liquidationPenalty as bigint | undefined) ?? 1300n,
+            insuranceFund: (lstate.insuranceFund as bigint | undefined) ?? 0n,
+            minDebt: (lstate.minDebt as bigint | undefined) ?? 100n,
+            paused: (lstate.paused as bigint | undefined) ?? 0n,
         };
     }
 
@@ -348,8 +357,12 @@ export class LendingService {
         let isLiquidatable = false;
 
         if (debtAmount > 0n) {
-            collateralRatio = (collateralAmount * 100n) / debtAmount;
-            isLiquidatable = collateralRatio < 150n;
+            // v3: oracle-price-aware ratio calculation
+            const protocolState = await this.getPublicState();
+            const oraclePrice = protocolState?.oraclePrice ?? 10000n;
+            const liquidationRatio = protocolState?.liquidationRatio ?? 150n;
+            collateralRatio = (collateralAmount * oraclePrice * 100n) / (debtAmount * 10000n);
+            isLiquidatable = collateralRatio < liquidationRatio;
         }
 
         return { collateralAmount, debtAmount, collateralRatio, isLiquidatable };
@@ -528,6 +541,46 @@ export class LendingService {
         const toObj = { bytes: Uint8Array.from(Buffer.from(toPublicKeyHex, 'hex')) };
         // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         const txData = await (this.contract!.callTx as any).transferFrom(fromObj, toObj, amount);
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    // ─── v3 Admin / Governance Operations ─────────────────────────────────────
+
+    async updateOraclePrice(newPrice: bigint, blockHeight: bigint): Promise<TxResult> {
+        this.requireContract();
+        if (newPrice <= 0n) throw new Error('Price must be positive');
+        const txData = await (this.contract!.callTx as any).updateOraclePrice(newPrice, blockHeight);
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    async updateMintingRatio(newRatio: bigint): Promise<TxResult> {
+        this.requireContract();
+        const txData = await (this.contract!.callTx as any).updateMintingRatio(newRatio);
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    async updateLiquidationRatio(newRatio: bigint): Promise<TxResult> {
+        this.requireContract();
+        const txData = await (this.contract!.callTx as any).updateLiquidationRatio(newRatio);
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    async updateDebtCeiling(newCeiling: bigint): Promise<TxResult> {
+        this.requireContract();
+        const txData = await (this.contract!.callTx as any).updateDebtCeiling(newCeiling);
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    async setPaused(pauseState: bigint): Promise<TxResult> {
+        this.requireContract();
+        const txData = await (this.contract!.callTx as any).setPaused(pauseState);
+        return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
+    }
+
+    async fundInsurance(amount: bigint): Promise<TxResult> {
+        this.requireContract();
+        if (amount <= 0n) throw new Error('Fund amount must be positive');
+        const txData = await (this.contract!.callTx as any).fundInsurance(amount);
         return { txHash: txData.public.txHash, blockHeight: BigInt(txData.public.blockHeight) };
     }
 
